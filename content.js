@@ -2,7 +2,7 @@
 // Ajoute à droite de chaque prix (onglet Labo) le ratio prix ÷ production
 // (prix du lot ÷ bits/s gagnés par ce lot). Plus c'est petit, mieux c'est.
 // Puis la hausse de production (en %) qu'apporterait l'achat,
-// puis un score combiné sur 100 (hausse % ÷ ratio).
+// puis un score combiné brut : hausse % ÷ ratio.
 // Couleur : vert = meilleur achat du moment, rouge = le plus cher relativement.
 (() => {
   'use strict';
@@ -63,11 +63,14 @@
     return Math.round(p).toLocaleString('fr-FR');
   }
 
-  /** Score sur 100 : 100, 42, 3,7, 0,25, <0,01 */
-  function fmtScore(v) {
-    if (v >= 10) return String(Math.round(v));
-    if (v < 0.01) return '<0,01';
-    return v.toLocaleString('fr-FR', { maximumSignificantDigits: 2 });
+  /** Petits nombres lisibles : 12,3 · 0,042 · 2,2×10⁻⁴ */
+  const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+  function fmtSci(v) {
+    if (!isFinite(v) || v <= 0) return '0';
+    if (v >= 1000) return fmt(v);
+    if (v >= 0.01) return v.toLocaleString('fr-FR', { maximumSignificantDigits: 3 });
+    const [m, e] = v.toExponential(1).split('e');
+    return `${m.replace('.', ',')}×10${String(parseInt(e, 10)).replace(/./g, (c) => SUP[c])}`;
   }
 
   /** Écart à l'optimum en ordres de grandeur → classe de couleur. */
@@ -101,8 +104,8 @@
 
     // Indicateurs par ligne :
     //   pct   = hausse de production (%)           — plus grand = mieux
-    //   score = pct × (production ÷ prix)          — = pct ÷ ratio affiché ; plus grand = mieux
-    //           (multiplier directement prix÷prod par % donnerait prix ÷ prod totale :
+    //   score = pct ÷ (prix ÷ production)          — valeur brute ; plus grand = mieux
+    //           (multiplier prix÷prod par % donnerait prix ÷ prod totale :
     //            le gain du bâtiment s'annulerait et seul le prix compterait)
     for (const r of rows) {
       r.pct = isFinite(r.gain) && r.gain > 0 && base > 0 ? (r.gain / base) * 100 : NaN;
@@ -144,15 +147,14 @@
       }
       setText(pctEl, pText, pTitle);
 
-      // 3) Score combiné, ramené sur 100 (100 = meilleur achat)
+      // 3) Score combiné, valeur brute : hausse % ÷ (prix ÷ production) (plus grand = meilleur)
       let sText = '—', sCls = 'lte-na', sTitle = 'Indicateurs 1 ou 2 indisponibles';
       if (isFinite(r.score) && bestScore > 0) {
-        const rel = (r.score / bestScore) * 100;
         sCls = tier(Math.log10(bestScore / r.score));
-        sText = `${fmtScore(rel)}${sCls === 'lte-best' ? ' ★' : ''}`;
+        sText = `${fmtSci(r.score)}${sCls === 'lte-best' ? ' ★' : ''}`;
         sTitle =
-          `Score = hausse % ÷ (prix ÷ production) = ${fmtPct(r.pct)} ÷ ${fmt(1 / r.ratio)}\n` +
-          `ramené sur 100 (100 = meilleur achat) — favorise les achats à la fois rentables et qui font monter la prod`;
+          `Score = hausse % ÷ (prix ÷ production) = ${fmtPct(r.pct)} ÷ ${fmt(1 / r.ratio)} = ${fmtSci(r.score)}\n` +
+          `(plus c'est grand, mieux c'est : achat à la fois rentable et qui fait monter la prod)`;
       }
       setText(scoreEl, sText, sTitle);
       setTier(scoreEl, sCls);
