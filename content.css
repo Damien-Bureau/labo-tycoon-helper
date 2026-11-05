@@ -80,3 +80,7 @@
   stroke: #4a58b8;
   transition: stroke-dasharray 0.15s linear;
 }
+/* Animation d'ouverture d'onglet : le contour se dessine depuis le milieu en haut jusqu'à sa valeur */
+.lte-ring-intro .lte-ring-prog {
+  transition: stroke-dasharray 0.9s cubic-bezier(0.22, 0.8, 0.3, 1);
+}

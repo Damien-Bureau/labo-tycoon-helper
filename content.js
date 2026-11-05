@@ -172,8 +172,10 @@
   }
 
   /** Contour de progression autour d'un bouton d'achat : cagnotte ÷ prix.
-   *  Masqué dès que l'achat est possible (classe « ok » posée par le jeu, ou cagnotte ≥ prix). */
-  function updateRing(btn, bits, cost) {
+   *  Masqué dès que l'achat est possible (classe « ok » posée par le jeu, ou cagnotte ≥ prix).
+   *  intro = true : le contour repart de 0 et se remplit jusqu'à sa valeur (ouverture de l'onglet). */
+  const INTRO_MS = 900;
+  function updateRing(btn, bits, cost, intro = false) {
     if (!btn) return;
     let svg = btn.querySelector(':scope > svg.lte-ring');
     if (!svg) {
@@ -205,27 +207,48 @@
     }
     const dash = `${(p * 100).toFixed(1)} 100`;
     const prog = svg.lastChild;
+    if (intro) {
+      // Animation d'ouverture : on part de 0, on force le rendu de ce point de départ, puis on vise la valeur
+      svg.classList.add('lte-ring-intro');
+      prog.setAttribute('stroke-dasharray', '0 100');
+      getComputedStyle(prog).strokeDasharray; // applique « 0 » avant la transition
+      clearTimeout(svg._lteIntro);
+      svg._lteIntro = setTimeout(() => svg.classList.remove('lte-ring-intro'), INTRO_MS);
+    }
     if (prog.getAttribute('stroke-dasharray') !== dash) prog.setAttribute('stroke-dasharray', dash);
   }
 
-  /** Mise à jour légère des seuls contours, onglets Labo et Améliorer (à chaque changement de la cagnotte). */
+  /** Remet les contours d'une zone à 0, sans animation (quand l'onglet se ferme), pour la prochaine ouverture. */
+  function resetRings(container) {
+    for (const prog of container.querySelectorAll('.lte-ring-prog')) prog.setAttribute('stroke-dasharray', '0 100');
+  }
+
+  /** Mise à jour légère des seuls contours, onglets Labo et Améliorer (à chaque changement de la cagnotte).
+   *  Quand un onglet devient visible, ses contours se remplissent depuis 0 (animation d'ouverture). */
+  const shown = { tycBuildings: false, tycUpgrades: false };
   function updateRings() {
     if (!cfg.rings || document.hidden) return;
     const bits = parseNum(document.getElementById('tycBits')?.textContent);
+    const zone = (id, eachButton) => {
+      const el = document.getElementById(id);
+      const visible = !!(el && el.offsetParent);
+      const intro = visible && !shown[id];
+      if (!visible && shown[id] && el) resetRings(el);
+      shown[id] = visible;
+      if (visible) eachButton(el, intro);
+    };
     // Labo : prix affiché dans le bouton (suit ×1 / ×10 / Max)
-    const list = document.getElementById('tycBuildings');
-    if (list && list.offsetParent) {
+    zone('tycBuildings', (list, intro) => {
       for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
-        updateRing(row.querySelector('.tyc-buy'), bits, parseNum(row.querySelector('.tyc-buyc')?.textContent));
+        updateRing(row.querySelector('.tyc-buy'), bits, parseNum(row.querySelector('.tyc-buyc')?.textContent), intro);
       }
-    }
+    });
     // Améliorer : prix exact fourni par le jeu dans data-cost (améliorations disponibles uniquement)
-    const ups = document.getElementById('tycUpgrades');
-    if (ups && ups.offsetParent) {
+    zone('tycUpgrades', (ups, intro) => {
       for (const tile of ups.querySelectorAll('.tyc-u[data-tyc-up][data-cost]')) {
-        updateRing(tile, bits, Number(tile.dataset.cost));
+        updateRing(tile, bits, Number(tile.dataset.cost), intro);
       }
-    }
+    });
   }
 
   function setText(el, text, title) {
@@ -271,6 +294,7 @@
     document.querySelectorAll('.lte-on').forEach((el) => el.classList.remove('lte-on'));
   };
   const removeRings = () => {
+    shown.tycBuildings = shown.tycUpgrades = false; // la prochaine activation rejoue l'animation
     document.querySelectorAll('.lte-ring').forEach((el) => el.remove());
     document.querySelectorAll('.lte-ring-on').forEach((el) => el.classList.remove('lte-ring-on'));
   };
