@@ -58,7 +58,7 @@
 .lte-awful { color: #d0102a; }
 .lte-na    { color: #9ca3af; }
 
-/* Hausse de production */
+/* Hausse de production : bleu, du clair (petite hausse) au foncé (grosse hausse), réglé en JS */
 .lte-pct { color: #4f5bd5; }
 
 /* Contour des boutons d'achat (onglets Labo et Améliorer) : se remplit selon cagnotte ÷ prix */
@@ -92,7 +92,6 @@
 .lte-next {
   margin-left: 6px;
   font-size: 12px;
-  font-weight: 500;
-  color: #858999;
+  font-weight: 600;
   cursor: help;
 }

@@ -32,14 +32,14 @@
   function fmtDuration(sec) {
     if (!isFinite(sec) || sec < 0) return '—';
     if (sec < 1) return '< 1 s';
-    if (sec < 60) return `${Math.round(sec)} s`;
-    const min = sec / 60;
-    if (min < 60) { const m = Math.floor(min), s = Math.round(sec - m * 60); return s ? `${m} min ${String(s).padStart(2, '0')}` : `${m} min`; }
-    const h = sec / 3600;
-    if (h < 24) { const hh = Math.floor(h), mm = Math.round((h - hh) * 60); return mm ? `${hh} h ${String(mm).padStart(2, '0')}` : `${hh} h`; }
-    const d = h / 24;
-    if (d < 365) { const dd = Math.floor(d), hh = Math.round((d - dd) * 24); return hh ? `${dd} j ${hh} h` : `${dd} j`; }
-    const y = d / 365;
+    if (sec < 59.5) return `${Math.round(sec)} s`;
+    const totalS = Math.round(sec);                       // arrondi d'abord : jamais « 9 min 60 »
+    if (totalS < 3600) { const m = Math.floor(totalS / 60), s = totalS % 60; return s ? `${m} min ${String(s).padStart(2, '0')}` : `${m} min`; }
+    const totalM = Math.round(sec / 60);
+    if (totalM < 24 * 60) { const h = Math.floor(totalM / 60), m = totalM % 60; return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`; }
+    const totalH = Math.round(sec / 3600);
+    if (totalH < 365 * 24) { const d = Math.floor(totalH / 24), h = totalH % 24; return h ? `${d} j ${h} h` : `${d} j`; }
+    const y = sec / (365 * 86400);
     if (y < 10) return `${y.toFixed(1).replace('.', ',')} ans`;
     if (y < 1e6) return `${Math.round(y).toLocaleString('fr-FR')} ans`;
     return '∞';
@@ -160,6 +160,8 @@
         pTitle = `Hausse de production = ${fmt(r.gain)}/s ÷ ${fmt(base)}/s = +${fmtPct(r.pct)} %\n(production de base, hors café / événements temporaires)`;
       }
       setText(pctEl, pText, pTitle);
+      const blue = isFinite(r.pct) && bestPct > 0 ? blueScale(r.pct / bestPct) : '';
+      if (pctEl.style.color !== blue) pctEl.style.color = blue;
 
       // 3) Prix d'un bit/s ÷ hausse % (plus petit = meilleur)
       let sText = '—', sCls = 'lte-na', sTitle = 'Indicateurs 1 ou 2 indisponibles';
@@ -187,7 +189,7 @@
       setTier(payEl, yCls);
 
       // Machines restantes avant la prochaine amélioration (après le nom)
-      updateNextTier(r, tiers);
+      updateNextTier(r, tiers, bits, rate);
     }
     fitColumns(list, rows[0]);
     updateRings();
@@ -221,7 +223,7 @@
     if (changed) chrome.storage.local.set({ tiers: learnedTiers });
     return learnedTiers;
   }
-  function updateNextTier(r, tiers) {
+  function updateNextTier(r, tiers, bits, rate) {
     const nameEl = r.row.querySelector('.tyc-bt b');
     if (!nameEl) return;
     let el = nameEl.querySelector(':scope > .lte-next');
@@ -236,12 +238,27 @@
     }
     const n = target - r.count;
     const price = (r.unit * (GROWTH ** n - 1)) / (GROWTH - 1);
+    // Couleur = temps pour pouvoir payer ces machines : vert = tout de suite … rouge = plus d'une heure
+    const missing = isFinite(bits) ? Math.max(0, price - bits) : NaN;
+    const wait = missing === 0 ? 0 : rate > 0 ? missing / rate : Infinity;
+    const cls = !isFinite(wait) && isNaN(missing) ? 'lte-na'
+      : wait === 0 ? 'lte-best' : wait < 60 ? 'lte-good' : wait < 600 ? 'lte-mid' : wait < 3600 ? 'lte-bad' : 'lte-awful';
+    setTier(el, cls);
     setText(
       el,
       `(${n} restante${n > 1 ? 's' : ''} · ${fmt(price)})`,
-      `Prochaine amélioration à ${target} ${r.name} : encore ${n} à acheter pour ${fmt(price)} bits` +
+      `Prochaine amélioration à ${target} ${r.name} : encore ${n} à acheter pour ${fmt(price)} bits\n` +
+        (wait === 0 ? 'Payable tout de suite' : `Payable dans ${fmtDuration(wait)} au rythme actuel`) +
         (learned.includes(target) ? '' : '\n(palier habituel du jeu, non encore confirmé pour cette machine)')
     );
+  }
+
+  /** Échelle de bleu pour la hausse de prod : rel = hausse ÷ meilleure hausse (log, sur 4 ordres de grandeur). */
+  function blueScale(rel) {
+    const t = Math.max(0, Math.min(1, 1 + Math.log10(Math.max(rel, 1e-9)) / 4)); // 1 = la plus forte hausse
+    const light = [150, 160, 220], dark = [30, 42, 150];
+    const c = light.map((v, i) => Math.round(v + (dark[i] - v) * t));
+    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
