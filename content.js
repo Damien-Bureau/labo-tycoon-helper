@@ -92,8 +92,8 @@
       let text = '—', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
       if (isFinite(r.ratio) && best > 0) {
         const pp = 1 / r.ratio; // prix ÷ production (plus petit = meilleur)
-        text = fmt(pp);
         cls = tier(Math.log10(best / r.ratio));
+        text = cls === 'lte-best' ? `${fmt(pp)} ★` : fmt(pp); // ★ = meilleur(s) achat(s), à moins de ~12 % du top
         title =
           `Prix ÷ production = ${fmt(r.cost)} ÷ ${fmt(r.gain)}/s = ${fmt(pp)}\n` +
           `(plus c'est petit, plus c'est rentable — ≈ ${fmtDuration(pp)} pour rembourser l'achat)`;
