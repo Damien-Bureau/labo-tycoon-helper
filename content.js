@@ -1,4 +1,4 @@
-// Labo Tycoon — Rentabilité
+// Labo Tycoon Helper
 // Ajoute à droite de chaque prix (onglet Labo) le ratio prix ÷ production
 // (prix du lot ÷ bits/s gagnés par ce lot). Plus c'est petit, mieux c'est.
 // Couleur : vert = meilleur achat du moment, rouge = le plus cher relativement.
@@ -83,33 +83,49 @@
     for (const r of rows) {
       let badge = r.row.querySelector(':scope > .lte-badge');
       if (!badge) {
-        badge = document.createElement('div');
+        badge = document.createElement('span');
         badge.className = 'lte-badge';
-        badge.innerHTML = '<b class="lte-time"></b><span class="lte-sub"></span>';
         r.row.appendChild(badge);
         r.row.classList.add('lte-on');
       }
 
-      let time = '—', sub = '', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
+      let text = '—', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
       if (isFinite(r.ratio) && best > 0) {
         const pp = 1 / r.ratio; // prix ÷ production (plus petit = meilleur)
-        const gap = Math.log10(best / r.ratio);
-        time = fmt(pp);
-        sub = gap < 0.05 ? '★ meilleur' : '';
-        cls = tier(gap);
+        text = fmt(pp);
+        cls = tier(Math.log10(best / r.ratio));
         title =
           `Prix ÷ production = ${fmt(r.cost)} ÷ ${fmt(r.gain)}/s = ${fmt(pp)}\n` +
           `(plus c'est petit, plus c'est rentable — ≈ ${fmtDuration(pp)} pour rembourser l'achat)`;
       }
 
-      const t = badge.firstChild, s = badge.lastChild;
-      if (t.textContent !== time) t.textContent = time;
-      if (s.textContent !== sub) s.textContent = sub;
+      if (badge.textContent !== text) badge.textContent = text;
       if (!badge.classList.contains(cls)) { badge.classList.remove('lte-na', ...TIERS); badge.classList.add(cls); }
       if (badge.title !== title) badge.title = title;
     }
   }
 
-  setInterval(update, 400);
+  // Le jeu réécrit la liste à chaque achat (innerHTML) : on réinjecte immédiatement,
+  // dans la même frame (les callbacks de MutationObserver passent avant le rendu),
+  // pour éviter que les nombres disparaissent puis réapparaissent.
+  let scheduled = false;
+  const observer = new MutationObserver((mutations) => {
+    if (scheduled) return;
+    const relevant = mutations.some((m) => {
+      const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+      return el && !el.closest('.lte-badge') && (el.id === 'tycBuildings' || el.closest('#tycBuildings'));
+    });
+    if (!relevant) return;
+    scheduled = true;
+    queueMicrotask(() => {
+      scheduled = false;
+      observer.disconnect();
+      try { update(); } finally { observe(); }
+    });
+  });
+  const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  observe();
+
+  setInterval(update, 1000); // filet de sécurité
   update();
 })();

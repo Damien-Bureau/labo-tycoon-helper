@@ -1,17 +1,26 @@
 {
   "manifest_version": 3,
-  "name": "Labo Tycoon — Rentabilité",
-  "version": "1.0.0",
-  "description": "Affiche à droite de chaque prix de l'onglet Labo le temps de rentabilisation (prix ÷ bits/s gagnés) et colore les achats du meilleur au pire.",
+  "name": "Labo Tycoon Helper",
+  "version": "1.1.0",
+  "description": "Affiche à droite de chaque bâtiment de l'onglet Labo le ratio prix ÷ production, coloré du meilleur au pire achat.",
   "content_scripts": [
     {
-      "matches": ["https://sector-production-b749.up.railway.app/*"],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://sector-production-b749.up.railway.app/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ],
   "browser_specific_settings": {
-    "gecko": { "id": "labo-tycoon-rentabilite@kastor.local", "strict_min_version": "109.0" }
+    "gecko": {
+      "id": "labo-tycoon-helper@damien-bureau",
+      "strict_min_version": "109.0"
+    }
   }
 }
