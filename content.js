@@ -4,6 +4,7 @@
 // Puis la hausse de production (en %) qu'apporterait l'achat,
 // puis un 3e indicateur : prix d'un bit/s ÷ hausse %.
 // Couleur : vert = meilleur achat du moment, rouge = le plus cher relativement.
+// Le contour de chaque bouton d'achat se remplit selon cagnotte ÷ prix.
 (() => {
   'use strict';
 
@@ -78,6 +79,7 @@
     const list = document.getElementById('tycBuildings');
     if (!list || !list.offsetParent) return; // onglet Labo fermé / non visible
 
+    const bits = parseNum(document.getElementById('tycBits')?.textContent); // cagnotte actuelle
     const rows = [];
     let base = 0; // production de base = somme des bits/s de chaque bâtiment (hors bonus temporaires)
     for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
@@ -115,6 +117,9 @@
       }
       const [badge, pctEl, scoreEl] = side.children;
 
+      // 0) Contour du bouton d'achat = cagnotte ÷ prix
+      updateRing(r.row.querySelector('.tyc-buy'), bits, r.cost);
+
       // 1) Ratio prix ÷ production (plus petit = meilleur)
       let text = '—', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
       if (isFinite(r.ratio) && best > 0) {
@@ -150,6 +155,33 @@
     }
   }
 
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  /** Dessine (ou met à jour) l'anneau de progression autour d'un bouton d'achat. */
+  function updateRing(btn, bits, cost) {
+    if (!btn) return;
+    let svg = btn.querySelector(':scope > svg.lte-ring');
+    if (!svg) {
+      svg = document.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('class', 'lte-ring');
+      svg.setAttribute('aria-hidden', 'true');
+      for (const cls of ['lte-ring-track', 'lte-ring-prog']) {
+        const rect = document.createElementNS(SVG_NS, 'rect');
+        rect.setAttribute('class', cls);
+        rect.setAttribute('pathLength', '100');
+        svg.appendChild(rect);
+      }
+      btn.appendChild(svg);
+      btn.classList.add('lte-ring-on');
+    }
+    const p = isFinite(bits) && isFinite(cost) && cost > 0 ? Math.max(0, Math.min(1, bits / cost)) : 0;
+    const dash = `${(p * 100).toFixed(2)} 100`;
+    const prog = svg.lastChild;
+    if (prog.getAttribute('stroke-dasharray') !== dash) prog.setAttribute('stroke-dasharray', dash);
+    svg.classList.toggle('lte-ring-full', p >= 1);
+    const pctTxt = isFinite(bits) && cost > 0 ? `Cagnotte : ${fmt(bits)} / ${fmt(cost)} (${Math.floor(Math.min(1, bits / cost) * 100)} %)` : '';
+    if (pctTxt && btn.title !== pctTxt) btn.title = pctTxt;
+  }
+
   function setText(el, text, title) {
     if (el.textContent !== text) el.textContent = text;
     if (el.title !== title) el.title = title;
@@ -166,7 +198,8 @@
     if (scheduled) return;
     const relevant = mutations.some((m) => {
       const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      return el && !el.closest('.lte-side') && (el.id === 'tycBuildings' || el.closest('#tycBuildings'));
+      return el && !el.closest('.lte-side, .lte-ring') &&
+        (el.id === 'tycBuildings' || el.closest('#tycBuildings') || el.closest('#tycBits'));
     });
     if (!relevant) return;
     scheduled = true;

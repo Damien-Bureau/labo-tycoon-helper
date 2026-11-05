@@ -38,3 +38,32 @@
 
 /* Hausse de production */
 .lte-pct { color: #4f5bd5; }
+
+/* Contour des boutons d'achat (onglet Labo) : se remplit selon cagnotte ÷ prix */
+.tyc-buy.lte-ring-on {
+  position: relative;
+}
+.lte-ring {
+  position: absolute;
+  inset: -1px; /* recouvre la bordure transparente du bouton */
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
+  overflow: visible;
+  pointer-events: none;
+}
+.lte-ring rect {
+  x: 1px;
+  y: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  rx: 11px;
+  ry: 11px;
+  fill: none;
+  stroke-width: 2px;
+}
+.lte-ring-track { stroke: rgba(74, 88, 184, 0.18); }
+.lte-ring-prog {
+  stroke: #4a58b8;
+  transition: stroke-dasharray 0.3s linear;
+}
+.lte-ring-full .lte-ring-prog { stroke: #16a34a; }
