@@ -1,7 +1,8 @@
 // Labo Tycoon Helper
 // Ajoute à droite de chaque prix (onglet Labo) le ratio prix ÷ production
 // (prix du lot ÷ bits/s gagnés par ce lot). Plus c'est petit, mieux c'est.
-// Puis, juste à droite, la hausse de production (en %) qu'apporterait l'achat.
+// Puis la hausse de production (en %) qu'apporterait l'achat,
+// puis un score combiné sur 100 (hausse % ÷ ratio).
 // Couleur : vert = meilleur achat du moment, rouge = le plus cher relativement.
 (() => {
   'use strict';
@@ -62,6 +63,13 @@
     return Math.round(p).toLocaleString('fr-FR');
   }
 
+  /** Score sur 100 : 100, 42, 3,7, 0,25, <0,01 */
+  function fmtScore(v) {
+    if (v >= 10) return String(Math.round(v));
+    if (v < 0.01) return '<0,01';
+    return v.toLocaleString('fr-FR', { maximumSignificantDigits: 2 });
+  }
+
   /** Écart à l'optimum en ordres de grandeur → classe de couleur. */
   function tier(gapLog10) {
     if (gapLog10 < 0.05) return 'lte-best';
@@ -91,43 +99,72 @@
       rows.push({ row, each, cost, qty, gain, ratio });
     }
 
-    const best = Math.max(...rows.map((r) => (isFinite(r.ratio) ? r.ratio : 0)));
+    // Indicateurs par ligne :
+    //   pct   = hausse de production (%)           — plus grand = mieux
+    //   score = pct × (production ÷ prix)          — = pct ÷ ratio affiché ; plus grand = mieux
+    //           (multiplier directement prix÷prod par % donnerait prix ÷ prod totale :
+    //            le gain du bâtiment s'annulerait et seul le prix compterait)
+    for (const r of rows) {
+      r.pct = isFinite(r.gain) && r.gain > 0 && base > 0 ? (r.gain / base) * 100 : NaN;
+      r.score = isFinite(r.pct) && isFinite(r.ratio) ? r.pct * r.ratio : NaN;
+    }
+    const maxOf = (k) => Math.max(0, ...rows.map((r) => (isFinite(r[k]) ? r[k] : 0)));
+    const best = maxOf('ratio'), bestPct = maxOf('pct'), bestScore = maxOf('score');
 
     for (const r of rows) {
       let side = r.row.querySelector(':scope > .lte-side');
-      if (!side) {
+      if (!side || side.children.length !== 3) {
+        side?.remove();
         side = document.createElement('span');
         side.className = 'lte-side';
-        side.innerHTML = '<span class="lte-badge"></span><span class="lte-pct"></span>';
+        side.innerHTML = '<span class="lte-badge"></span><span class="lte-pct"></span><span class="lte-score"></span>';
         r.row.appendChild(side);
         r.row.classList.add('lte-on');
       }
-      const badge = side.firstChild, pctEl = side.lastChild;
+      const [badge, pctEl, scoreEl] = side.children;
 
-      // 1) Ratio prix ÷ production
+      // 1) Ratio prix ÷ production (plus petit = meilleur)
       let text = '—', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
       if (isFinite(r.ratio) && best > 0) {
-        const pp = 1 / r.ratio; // prix ÷ production (plus petit = meilleur)
+        const pp = 1 / r.ratio;
         cls = tier(Math.log10(best / r.ratio));
-        text = cls === 'lte-best' ? `${fmt(pp)} ★` : fmt(pp); // ★ = meilleur(s) achat(s), à moins de ~12 % du top
+        text = cls === 'lte-best' ? `${fmt(pp)} ★` : fmt(pp); // ★ = à moins de ~12 % du meilleur
         title =
           `Prix ÷ production = ${fmt(r.cost)} ÷ ${fmt(r.gain)}/s = ${fmt(pp)}\n` +
           `(plus c'est petit, plus c'est rentable — ≈ ${fmtDuration(pp)} pour rembourser l'achat)`;
       }
-      if (badge.textContent !== text) badge.textContent = text;
-      if (!badge.classList.contains(cls)) { badge.classList.remove('lte-na', ...TIERS); badge.classList.add(cls); }
-      if (badge.title !== title) badge.title = title;
+      setText(badge, text, title);
+      setTier(badge, cls);
 
-      // 2) Hausse de production apportée par l'achat
+      // 2) Hausse de production apportée par l'achat (plus grand = meilleur)
       let pText = '—', pTitle = 'Production actuelle inconnue';
-      if (isFinite(r.gain) && r.gain > 0 && base > 0) {
-        const pct = (r.gain / base) * 100;
-        pText = `+${fmtPct(pct)} %`;
-        pTitle = `Hausse de production = ${fmt(r.gain)}/s ÷ ${fmt(base)}/s = +${fmtPct(pct)} %\n(production de base, hors café / événements temporaires)`;
+      if (isFinite(r.pct)) {
+        pText = `+${fmtPct(r.pct)} %${r.pct >= bestPct ? ' ★' : ''}`;
+        pTitle = `Hausse de production = ${fmt(r.gain)}/s ÷ ${fmt(base)}/s = +${fmtPct(r.pct)} %\n(production de base, hors café / événements temporaires)`;
       }
-      if (pctEl.textContent !== pText) pctEl.textContent = pText;
-      if (pctEl.title !== pTitle) pctEl.title = pTitle;
+      setText(pctEl, pText, pTitle);
+
+      // 3) Score combiné, ramené sur 100 (100 = meilleur achat)
+      let sText = '—', sCls = 'lte-na', sTitle = 'Indicateurs 1 ou 2 indisponibles';
+      if (isFinite(r.score) && bestScore > 0) {
+        const rel = (r.score / bestScore) * 100;
+        sCls = tier(Math.log10(bestScore / r.score));
+        sText = `${fmtScore(rel)}${sCls === 'lte-best' ? ' ★' : ''}`;
+        sTitle =
+          `Score = hausse % ÷ (prix ÷ production) = ${fmtPct(r.pct)} ÷ ${fmt(1 / r.ratio)}\n` +
+          `ramené sur 100 (100 = meilleur achat) — favorise les achats à la fois rentables et qui font monter la prod`;
+      }
+      setText(scoreEl, sText, sTitle);
+      setTier(scoreEl, sCls);
     }
+  }
+
+  function setText(el, text, title) {
+    if (el.textContent !== text) el.textContent = text;
+    if (el.title !== title) el.title = title;
+  }
+  function setTier(el, cls) {
+    if (!el.classList.contains(cls)) { el.classList.remove('lte-na', ...TIERS); el.classList.add(cls); }
   }
 
   // Le jeu réécrit la liste à chaque achat (innerHTML) : on réinjecte immédiatement,

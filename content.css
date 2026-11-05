@@ -19,14 +19,16 @@
 }
 
 .lte-badge,
-.lte-pct {
+.lte-pct,
+.lte-score {
   cursor: help;
 }
 
-/* Largeur fixe pour que la colonne des % reste alignée */
-.lte-badge { min-width: 62px; }
+/* Largeurs fixes pour que les colonnes restent alignées */
+.lte-badge { min-width: 74px; }
+.lte-pct   { min-width: 84px; }
 
-/* Ratio prix ÷ production : vert = meilleur achat, rouge = le plus cher */
+/* Ratio prix ÷ production et score : vert = meilleur achat, rouge = le plus cher */
 .lte-best  { color: #15803d; }
 .lte-good  { color: #65a30d; }
 .lte-mid   { color: #c29a00; }
