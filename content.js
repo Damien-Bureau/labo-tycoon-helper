@@ -1,6 +1,7 @@
 // Labo Tycoon Helper
 // Ajoute à droite de chaque prix (onglet Labo) le ratio prix ÷ production
 // (prix du lot ÷ bits/s gagnés par ce lot). Plus c'est petit, mieux c'est.
+// Puis, juste à droite, la hausse de production (en %) qu'apporterait l'achat.
 // Couleur : vert = meilleur achat du moment, rouge = le plus cher relativement.
 (() => {
   'use strict';
@@ -53,6 +54,14 @@
     return `${s} ${UNIT_NAMES[i]}`;
   }
 
+  /** 0,0004 → "<0,001" ; 0,00264 → "0,0026" ; 0,973 → "0,97" ; 3,45 → "3,5" ; 27,8 → "28" */
+  function fmtPct(p) {
+    if (p < 0.001) return '<0,001';
+    if (p < 1) return p.toLocaleString('fr-FR', { maximumSignificantDigits: 2 });
+    if (p < 10) return p.toFixed(1).replace('.', ',');
+    return Math.round(p).toLocaleString('fr-FR');
+  }
+
   /** Écart à l'optimum en ordres de grandeur → classe de couleur. */
   function tier(gapLog10) {
     if (gapLog10 < 0.05) return 'lte-best';
@@ -69,10 +78,14 @@
     if (!list || !list.offsetParent) return; // onglet Labo fermé / non visible
 
     const rows = [];
+    let base = 0; // production de base = somme des bits/s de chaque bâtiment (hors bonus temporaires)
     for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
       const each = parseNum(row.querySelector('.tyc-each')?.textContent);
       const cost = parseNum(row.querySelector('.tyc-buyc')?.textContent);
       const qty = parseQty(row.querySelector('.tyc-buyl')?.textContent);
+      const owned = (row.querySelector('.tyc-cnt')?.textContent || '').trim() !== '';
+      const total = owned ? parseNum(row.querySelector('.tyc-bt .muted.small')?.textContent) : 0;
+      if (isFinite(total)) base += total;
       const gain = each * qty; // bits/s ajoutés par cet achat
       const ratio = gain > 0 && cost > 0 ? gain / cost : NaN; // (bits/s) par bit dépensé
       rows.push({ row, each, cost, qty, gain, ratio });
@@ -81,14 +94,17 @@
     const best = Math.max(...rows.map((r) => (isFinite(r.ratio) ? r.ratio : 0)));
 
     for (const r of rows) {
-      let badge = r.row.querySelector(':scope > .lte-badge');
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'lte-badge';
-        r.row.appendChild(badge);
+      let side = r.row.querySelector(':scope > .lte-side');
+      if (!side) {
+        side = document.createElement('span');
+        side.className = 'lte-side';
+        side.innerHTML = '<span class="lte-badge"></span><span class="lte-pct"></span>';
+        r.row.appendChild(side);
         r.row.classList.add('lte-on');
       }
+      const badge = side.firstChild, pctEl = side.lastChild;
 
+      // 1) Ratio prix ÷ production
       let text = '—', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
       if (isFinite(r.ratio) && best > 0) {
         const pp = 1 / r.ratio; // prix ÷ production (plus petit = meilleur)
@@ -98,10 +114,19 @@
           `Prix ÷ production = ${fmt(r.cost)} ÷ ${fmt(r.gain)}/s = ${fmt(pp)}\n` +
           `(plus c'est petit, plus c'est rentable — ≈ ${fmtDuration(pp)} pour rembourser l'achat)`;
       }
-
       if (badge.textContent !== text) badge.textContent = text;
       if (!badge.classList.contains(cls)) { badge.classList.remove('lte-na', ...TIERS); badge.classList.add(cls); }
       if (badge.title !== title) badge.title = title;
+
+      // 2) Hausse de production apportée par l'achat
+      let pText = '—', pTitle = 'Production actuelle inconnue';
+      if (isFinite(r.gain) && r.gain > 0 && base > 0) {
+        const pct = (r.gain / base) * 100;
+        pText = `+${fmtPct(pct)} %`;
+        pTitle = `Hausse de production = ${fmt(r.gain)}/s ÷ ${fmt(base)}/s = +${fmtPct(pct)} %\n(production de base, hors café / événements temporaires)`;
+      }
+      if (pctEl.textContent !== pText) pctEl.textContent = pText;
+      if (pctEl.title !== pTitle) pctEl.title = pTitle;
     }
   }
 
@@ -113,7 +138,7 @@
     if (scheduled) return;
     const relevant = mutations.some((m) => {
       const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      return el && !el.closest('.lte-badge') && (el.id === 'tycBuildings' || el.closest('#tycBuildings'));
+      return el && !el.closest('.lte-side') && (el.id === 'tycBuildings' || el.closest('#tycBuildings'));
     });
     if (!relevant) return;
     scheduled = true;

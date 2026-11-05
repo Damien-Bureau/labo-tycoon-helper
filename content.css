@@ -1,25 +1,38 @@
-/* Labo Tycoon Helper — le ratio est posé à droite de la carte blanche, sans fond. */
+/* Labo Tycoon Helper — indicateurs posés à droite de la carte blanche, sans fond. */
 .tyc-b.lte-on {
   position: relative;
   overflow: visible;
 }
 
-.lte-badge {
+.lte-side {
   position: absolute;
   left: calc(100% + 12px);
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
-  cursor: help;
-  pointer-events: auto;
 }
 
+.lte-badge,
+.lte-pct {
+  cursor: help;
+}
+
+/* Largeur fixe pour que la colonne des % reste alignée */
+.lte-badge { min-width: 62px; }
+
+/* Ratio prix ÷ production : vert = meilleur achat, rouge = le plus cher */
 .lte-best  { color: #15803d; }
 .lte-good  { color: #65a30d; }
 .lte-mid   { color: #c29a00; }
 .lte-bad   { color: #f07800; }
 .lte-awful { color: #d0102a; }
 .lte-na    { color: #9ca3af; }
+
+/* Hausse de production */
+.lte-pct { color: #4f5bd5; }
