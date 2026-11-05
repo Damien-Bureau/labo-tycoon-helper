@@ -247,13 +247,37 @@
     queueMicrotask(() => {
       const full = pendingFull;
       scheduled = pendingFull = pendingRings = false;
+      if (!enabled) return;
       observer.disconnect();
-      try { full ? update() : updateRings(); } finally { observe(); }
+      try { full ? update() : updateRings(); } finally { if (enabled) observe(); }
     });
   });
   const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-  observe();
 
-  setInterval(update, 1000); // filet de sécurité
-  update();
+  /* ------------------------- Activation (popup) ------------------------- */
+  // L'état est stocké dans chrome.storage.local sous la clé « enabled » (true par défaut).
+  let enabled = false, timer = null;
+
+  function start() {
+    if (enabled) return;
+    enabled = true;
+    observe();
+    timer = setInterval(update, 1000); // filet de sécurité
+    update();
+  }
+
+  /** Retire tout ce que l'extension a ajouté : la page redevient exactement celle du site. */
+  function stop() {
+    if (!enabled) return;
+    enabled = false;
+    observer.disconnect();
+    clearInterval(timer);
+    document.querySelectorAll('.lte-side, .lte-ring').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-on, .lte-ring-on').forEach((el) => el.classList.remove('lte-on', 'lte-ring-on'));
+  }
+
+  chrome.storage.local.get({ enabled: true }, (st) => (st.enabled ? start() : stop()));
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.enabled) (changes.enabled.newValue === false ? stop() : start());
+  });
 })();
