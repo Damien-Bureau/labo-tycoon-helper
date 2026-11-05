@@ -4,7 +4,7 @@
 // Puis la hausse de production (en %) qu'apporterait l'achat,
 // puis un 3e indicateur : prix d'un bit/s ÷ hausse %.
 // Couleur : vert = meilleur achat du moment, rouge = le plus cher relativement.
-// Le contour de chaque bouton d'achat se remplit selon cagnotte ÷ prix.
+// Le contour de chaque bouton d'achat (onglets Labo et Améliorer) se remplit selon cagnotte ÷ prix.
 (() => {
   'use strict';
 
@@ -77,9 +77,8 @@
 
   function update() {
     const list = document.getElementById('tycBuildings');
-    if (!list || document.hidden || !list.offsetParent) return; // onglet Labo fermé / page en arrière-plan
+    if (!list || document.hidden || !list.offsetParent) { updateRings(); return; } // Labo non affiché
 
-    const bits = parseNum(document.getElementById('tycBits')?.textContent); // cagnotte actuelle
     const rows = [];
     let base = 0; // production de base = somme des bits/s de chaque bâtiment (hors bonus temporaires)
     for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
@@ -117,9 +116,6 @@
       }
       const [badge, pctEl, scoreEl] = side.children;
 
-      // 0) Contour du bouton d'achat = cagnotte ÷ prix
-      updateRing(r.row.querySelector('.tyc-buy'), bits, r.cost);
-
       // 1) Ratio prix ÷ production (plus petit = meilleur)
       let text = '—', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
       if (isFinite(r.ratio) && best > 0) {
@@ -153,19 +149,21 @@
       setText(scoreEl, sText, sTitle);
       setTier(scoreEl, sCls);
     }
+    updateRings();
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   /** Contour arrondi qui part du milieu en haut et tourne dans le sens horaire. */
-  function ringPath(w, h) {
-    const i = 1, r = 10; // trait centré à 1 px du bord, rayon = bordure du bouton (11 px) − 1
+  function ringPath(w, h, r) {
+    const i = 1; // trait centré à 1 px du bord ; r = rayon du bouton − 1
     const L = i, T = i, R = w - i, B = h - i, cx = w / 2;
     return `M${cx},${T} H${R - r} A${r},${r} 0 0 1 ${R},${T + r} V${B - r} A${r},${r} 0 0 1 ${R - r},${B} ` +
       `H${L + r} A${r},${r} 0 0 1 ${L},${B - r} V${T + r} A${r},${r} 0 0 1 ${L + r},${T} Z`;
   }
 
-  /** Contour de progression autour d'un bouton d'achat : cagnotte ÷ prix. Masqué dès que l'achat est possible. */
+  /** Contour de progression autour d'un bouton d'achat : cagnotte ÷ prix.
+   *  Masqué dès que l'achat est possible (classe « ok » posée par le jeu, ou cagnotte ≥ prix). */
   function updateRing(btn, bits, cost) {
     if (!btn) return;
     let svg = btn.querySelector(':scope > svg.lte-ring');
@@ -183,7 +181,7 @@
       btn.classList.add('lte-ring-on');
     }
     const p = isFinite(bits) && isFinite(cost) && cost > 0 ? Math.max(0, Math.min(1, bits / cost)) : 0;
-    const full = p >= 1;
+    const full = p >= 1 || btn.classList.contains('ok');
     if (svg.classList.contains('lte-ring-hidden') !== full) svg.classList.toggle('lte-ring-hidden', full);
     if (full) return; // achat possible : on laisse le bouton tel que le site l'affiche
 
@@ -192,7 +190,8 @@
     if (svg.dataset.size !== size && w && h) {
       svg.dataset.size = size;
       svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-      const d = ringPath(w, h);
+      const radius = Math.max(0, (parseFloat(getComputedStyle(btn).borderTopLeftRadius) || 11) - 1);
+      const d = ringPath(w, h, Math.min(radius, w / 2 - 1, h / 2 - 1));
       for (const path of svg.children) path.setAttribute('d', d);
     }
     const dash = `${(p * 100).toFixed(1)} 100`;
@@ -200,13 +199,23 @@
     if (prog.getAttribute('stroke-dasharray') !== dash) prog.setAttribute('stroke-dasharray', dash);
   }
 
-  /** Mise à jour légère des seuls contours (appelée à chaque changement de la cagnotte). */
+  /** Mise à jour légère des seuls contours, onglets Labo et Améliorer (à chaque changement de la cagnotte). */
   function updateRings() {
-    const list = document.getElementById('tycBuildings');
-    if (!list || document.hidden) return;
+    if (document.hidden) return;
     const bits = parseNum(document.getElementById('tycBits')?.textContent);
-    for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
-      updateRing(row.querySelector('.tyc-buy'), bits, parseNum(row.querySelector('.tyc-buyc')?.textContent));
+    // Labo : prix affiché dans le bouton (suit ×1 / ×10 / Max)
+    const list = document.getElementById('tycBuildings');
+    if (list && list.offsetParent) {
+      for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
+        updateRing(row.querySelector('.tyc-buy'), bits, parseNum(row.querySelector('.tyc-buyc')?.textContent));
+      }
+    }
+    // Améliorer : prix exact fourni par le jeu dans data-cost (améliorations disponibles uniquement)
+    const ups = document.getElementById('tycUpgrades');
+    if (ups && ups.offsetParent) {
+      for (const tile of ups.querySelectorAll('.tyc-u[data-tyc-up][data-cost]')) {
+        updateRing(tile, bits, Number(tile.dataset.cost));
+      }
     }
   }
 
@@ -231,7 +240,7 @@
       const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
       if (!el || el.closest('.lte-side, .lte-ring')) continue;
       if (el.id === 'tycBuildings' || el.closest('#tycBuildings')) pendingFull = true;
-      else if (el.closest('#tycBits')) pendingRings = true;
+      else if (el.closest('#tycBits') || el.closest('#tycUpgrades')) pendingRings = true;
     }
     if (scheduled || !(pendingFull || pendingRings)) return;
     scheduled = true;

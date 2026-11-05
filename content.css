@@ -39,8 +39,8 @@
 /* Hausse de production */
 .lte-pct { color: #4f5bd5; }
 
-/* Contour des boutons d'achat (onglet Labo) : se remplit selon cagnotte ÷ prix */
-.tyc-buy.lte-ring-on {
+/* Contour des boutons d'achat (onglets Labo et Améliorer) : se remplit selon cagnotte ÷ prix */
+.lte-ring-on {
   position: relative;
 }
 .lte-ring {
