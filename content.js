@@ -199,11 +199,12 @@
   /* ---- Panneau de gauche : durée hors ligne max et café ----
    * Hors ligne : le serveur n'envoie pas le maximum. Base 12 h (message « Pendant ton absence » du jeu)
    * + bonus obtenus : améliorations installées, R&D terminées, composants trouvés (« Production hors ligne : +N h »).
-   * Café : le jeu met multiplicateur et durée dans l'info-bulle du bouton café. */
+   * Café : le jeu met multiplicateur et durée dans l'info-bulle du bouton café.
+   * Réglage « stats » de la popup. */
   const OFFLINE_BASE_H = 12;
   let extrasAt = 0;
   function updateExtras() {
-    if (!cfg.indicators || document.hidden) return;
+    if (!cfg.stats || document.hidden) return;
     const now = performance.now();
     if (now - extrasAt < 1000) return; // 1 fois par seconde suffit
     extrasAt = now;
@@ -489,16 +490,19 @@
   const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
   /* ------------------------- Réglages (popup) ------------------------- */
-  // chrome.storage.local : { indicators: bool, rings: bool } (tous deux true par défaut).
-  const DEFAULTS = { indicators: true, rings: true };
+  // chrome.storage.local : { indicators, rings, stats } (booléens, true par défaut).
+  const DEFAULTS = { indicators: true, rings: true, stats: true };
   let cfg = { indicators: false, rings: false };
   let running = false, timer = null;
 
   const removeIndicators = () => {
-    document.querySelectorAll('.lte-side, .lte-head, .lte-next, .lte-extra').forEach((el) => el.remove());
-    extrasAt = 0;
+    document.querySelectorAll('.lte-side, .lte-head, .lte-next').forEach((el) => el.remove());
     document.getElementById('tycBuildings')?.style.removeProperty('--lte-shrink');
     document.querySelectorAll('.lte-on').forEach((el) => el.classList.remove('lte-on'));
+  };
+  const removeStats = () => {
+    document.querySelectorAll('.lte-extra').forEach((el) => el.remove());
+    extrasAt = 0;
   };
   const removeRings = () => {
     shown.tycBuildings = shown.tycUpgrades = false; // la prochaine activation rejoue l'animation
@@ -511,7 +515,8 @@
     cfg = { ...cfg, ...next };
     if (!cfg.indicators) removeIndicators();
     if (!cfg.rings) removeRings();
-    const active = cfg.indicators || cfg.rings;
+    if (!cfg.stats) removeStats();
+    const active = cfg.indicators || cfg.rings || cfg.stats;
     if (active && !running) {
       running = true;
       observe();
@@ -527,8 +532,8 @@
   chrome.storage.local.get(null, (st) => {
     // Ancienne version : un seul interrupteur « enabled »
     if (typeof st.enabled === 'boolean' && st.indicators === undefined && st.rings === undefined) {
-      st.indicators = st.rings = st.enabled;
-      chrome.storage.local.set({ indicators: st.enabled, rings: st.enabled });
+      st.indicators = st.rings = st.stats = st.enabled;
+      chrome.storage.local.set({ indicators: st.enabled, rings: st.enabled, stats: st.enabled });
       chrome.storage.local.remove('enabled');
     }
     learnedTiers = st.tiers || {};
