@@ -2,7 +2,7 @@
 // Ajoute à droite de chaque prix (onglet Labo) le ratio prix ÷ production
 // (prix du lot ÷ bits/s gagnés par ce lot). Plus c'est petit, mieux c'est.
 // Puis la hausse de production (en %) qu'apporterait l'achat,
-// puis un score combiné brut : hausse % ÷ ratio.
+// puis un 3e indicateur : prix d'un bit/s × hausse %.
 // Couleur : vert = meilleur achat du moment, rouge = le plus cher relativement.
 (() => {
   'use strict';
@@ -63,16 +63,6 @@
     return Math.round(p).toLocaleString('fr-FR');
   }
 
-  /** Petits nombres lisibles : 12,3 · 0,042 · 2,2×10⁻⁴ */
-  const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
-  function fmtSci(v) {
-    if (!isFinite(v) || v <= 0) return '0';
-    if (v >= 1000) return fmt(v);
-    if (v >= 0.01) return v.toLocaleString('fr-FR', { maximumSignificantDigits: 3 });
-    const [m, e] = v.toExponential(1).split('e');
-    return `${m.replace('.', ',')}×10${String(parseInt(e, 10)).replace(/./g, (c) => SUP[c])}`;
-  }
-
   /** Écart à l'optimum en ordres de grandeur → classe de couleur. */
   function tier(gapLog10) {
     if (gapLog10 < 0.05) return 'lte-best';
@@ -104,15 +94,15 @@
 
     // Indicateurs par ligne :
     //   pct   = hausse de production (%)           — plus grand = mieux
-    //   score = pct ÷ (prix ÷ production)          — valeur brute ; plus grand = mieux
-    //           (multiplier prix÷prod par % donnerait prix ÷ prod totale :
-    //            le gain du bâtiment s'annulerait et seul le prix compterait)
+    //   score = (prix ÷ production) × pct          — plus petit = mieux
+    //           (se simplifie en prix ÷ production totale × 100)
     for (const r of rows) {
       r.pct = isFinite(r.gain) && r.gain > 0 && base > 0 ? (r.gain / base) * 100 : NaN;
-      r.score = isFinite(r.pct) && isFinite(r.ratio) ? r.pct * r.ratio : NaN;
+      r.score = isFinite(r.pct) && isFinite(r.ratio) ? r.pct / r.ratio : NaN;
     }
     const maxOf = (k) => Math.max(0, ...rows.map((r) => (isFinite(r[k]) ? r[k] : 0)));
-    const best = maxOf('ratio'), bestPct = maxOf('pct'), bestScore = maxOf('score');
+    const best = maxOf('ratio'), bestPct = maxOf('pct');
+    const bestScore = Math.min(...rows.map((r) => (isFinite(r.score) && r.score > 0 ? r.score : Infinity)));
 
     for (const r of rows) {
       let side = r.row.querySelector(':scope > .lte-side');
@@ -147,14 +137,14 @@
       }
       setText(pctEl, pText, pTitle);
 
-      // 3) Score combiné, valeur brute : hausse % ÷ (prix ÷ production) (plus grand = meilleur)
+      // 3) Prix d'un bit/s × hausse % (plus petit = meilleur)
       let sText = '—', sCls = 'lte-na', sTitle = 'Indicateurs 1 ou 2 indisponibles';
-      if (isFinite(r.score) && bestScore > 0) {
-        sCls = tier(Math.log10(bestScore / r.score));
-        sText = `${fmtSci(r.score)}${sCls === 'lte-best' ? ' ★' : ''}`;
+      if (isFinite(r.score) && r.score > 0 && isFinite(bestScore)) {
+        sCls = tier(Math.log10(r.score / bestScore));
+        sText = `${fmt(r.score)}${sCls === 'lte-best' ? ' ★' : ''}`;
         sTitle =
-          `Score = hausse % ÷ (prix ÷ production) = ${fmtPct(r.pct)} ÷ ${fmt(1 / r.ratio)} = ${fmtSci(r.score)}\n` +
-          `(plus c'est grand, mieux c'est : achat à la fois rentable et qui fait monter la prod)`;
+          `Prix d'un bit/s × hausse % = ${fmt(1 / r.ratio)} × ${fmtPct(r.pct)} = ${fmt(r.score)}\n` +
+          `(plus c'est petit, mieux c'est)`;
       }
       setText(scoreEl, sText, sTitle);
       setTier(scoreEl, sCls);
