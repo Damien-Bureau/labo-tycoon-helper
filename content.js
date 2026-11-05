@@ -172,10 +172,10 @@
   }
 
   /** Contour de progression autour d'un bouton d'achat : cagnotte ÷ prix.
-   *  Masqué dès que l'achat est possible (classe « ok » posée par le jeu, ou cagnotte ≥ prix).
+   *  p = progression 0…1 ; full = achat possible → contour masqué (style d'origine du site).
    *  intro = true : le contour repart de 0 et se remplit jusqu'à sa valeur (ouverture de l'onglet). */
   const INTRO_MS = 900;
-  function updateRing(btn, bits, cost, intro = false) {
+  function updateRing(btn, p, full, intro = false) {
     if (!btn) return;
     let svg = btn.querySelector(':scope > svg.lte-ring');
     if (!svg) {
@@ -191,8 +191,7 @@
       btn.appendChild(svg);
       btn.classList.add('lte-ring-on');
     }
-    const p = isFinite(bits) && isFinite(cost) && cost > 0 ? Math.max(0, Math.min(1, bits / cost)) : 0;
-    const full = p >= 1 || btn.classList.contains('ok');
+    p = isFinite(p) ? Math.max(0, Math.min(1, p)) : 0;
     if (svg.classList.contains('lte-ring-hidden') !== full) svg.classList.toggle('lte-ring-hidden', full);
     if (full) return; // achat possible : on laisse le bouton tel que le site l'affiche
 
@@ -223,12 +222,44 @@
     for (const prog of container.querySelectorAll('.lte-ring-prog')) prog.setAttribute('stroke-dasharray', '0 100');
   }
 
+  /* ---- Cagnotte précise ----
+   * Le compteur du jeu est arrondi (« 1 Md » = entre 1,0 et 1,1 Md). On estime la vraie valeur :
+   * elle avance au rythme affiché (bits/s) et reste dans l'intervalle compatible avec l'affichage ;
+   * à chaque changement du chiffre affiché, l'estimation se recale exactement sur la nouvelle borne. */
+  const bitsTracker = { est: NaN, t: 0 };
+  /** Pas du dernier chiffre affiché : "1 Md" → 0,1 Md ; "4,9 Md" → 0,1 Md ; "368 M" → 1 M ; "12 345" → 1 */
+  function displayStep(text) {
+    const m = String(text).replace(/[\s\u00a0\u202f]+(?=\d)/g, '').match(/(\d+)(?:[.,](\d+))?\s*([A-Za-z]*)/);
+    if (!m || UNITS[m[3]] === undefined) return 0;
+    const unit = UNITS[m[3]];
+    if (m[2]) return unit * 10 ** -m[2].length;
+    if (!m[3]) return 1;
+    return (Number(m[1]) >= 100 ? 1 : 0.1) * unit;
+  }
+  function readBits() {
+    const text = document.getElementById('tycBits')?.textContent;
+    const low = parseNum(text);
+    if (!isFinite(low)) return NaN;
+    const step = displayStep(text), high = low + step;
+    const rate = parseNum(document.getElementById('tycRate')?.textContent) || 0;
+    const now = performance.now(), T = bitsTracker;
+    if (isFinite(T.est) && now - T.t < 5000) T.est += (rate * (now - T.t)) / 1000;
+    else T.est = low;
+    if (T.est < low) T.est = low;                       // le chiffre affiché vient de monter : recalage
+    if (step > 0 && T.est >= high) T.est = high - step * 1e-3; // jamais au-delà de ce que l'affichage permet
+    T.t = now;
+    return T.est;
+  }
+
+  // Prix du bâtiment n°c = base × GROWTH^c (S.view.growth du jeu, mesuré à 1,15 via les prix ×1 / ×10).
+  const GROWTH = 1.15;
+
   /** Mise à jour légère des seuls contours, onglets Labo et Améliorer (à chaque changement de la cagnotte).
    *  Quand un onglet devient visible, ses contours se remplissent depuis 0 (animation d'ouverture). */
   const shown = { tycBuildings: false, tycUpgrades: false };
   function updateRings() {
     if (!cfg.rings || document.hidden) return;
-    const bits = parseNum(document.getElementById('tycBits')?.textContent);
+    const bits = readBits();
     const zone = (id, eachButton) => {
       const el = document.getElementById(id);
       const visible = !!(el && el.offsetParent);
@@ -240,13 +271,25 @@
     // Labo : prix affiché dans le bouton (suit ×1 / ×10 / Max)
     zone('tycBuildings', (list, intro) => {
       for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
-        updateRing(row.querySelector('.tyc-buy'), bits, parseNum(row.querySelector('.tyc-buyc')?.textContent), intro);
+        const btn = row.querySelector('.tyc-buy');
+        const cost = parseNum(row.querySelector('.tyc-buyc')?.textContent);
+        const label = row.querySelector('.tyc-buyl')?.textContent || '';
+        const k = /^\s*Max/.test(label) ? Number((label.match(/\d+/) || [0])[0]) : 0;
+        if (k >= 1 && isFinite(cost) && isFinite(bits)) {
+          // Mode Max avec au moins 1 achetable : contour toujours affiché = progression vers le (k+1)e
+          const next = (cost * (GROWTH - 1) * GROWTH ** k) / (GROWTH ** k - 1); // prix de l'unité suivante
+          updateRing(btn, Math.min(0.999, (bits - cost) / next), false, intro);
+        } else {
+          const p = bits / cost;
+          updateRing(btn, p, p >= 1 || !!btn?.classList.contains('ok'), intro);
+        }
       }
     });
     // Améliorer : prix exact fourni par le jeu dans data-cost (améliorations disponibles uniquement)
     zone('tycUpgrades', (ups, intro) => {
       for (const tile of ups.querySelectorAll('.tyc-u[data-tyc-up][data-cost]')) {
-        updateRing(tile, bits, Number(tile.dataset.cost), intro);
+        const p = bits / Number(tile.dataset.cost);
+        updateRing(tile, p, p >= 1 || tile.classList.contains('ok'), intro);
       }
     });
   }
