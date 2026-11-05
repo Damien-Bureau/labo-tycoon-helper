@@ -1,6 +1,6 @@
 // Labo Tycoon — Rentabilité
-// Ajoute à droite de chaque prix (onglet Labo) le temps de rentabilisation :
-//   prix ÷ (bits/s gagnés)  — c'est l'inverse du ratio bits/s ÷ prix, plus lisible.
+// Ajoute à droite de chaque prix (onglet Labo) le ratio prix ÷ production
+// (prix du lot ÷ bits/s gagnés par ce lot). Plus c'est petit, mieux c'est.
 // Couleur : vert = meilleur achat du moment, rouge = le plus cher relativement.
 (() => {
   'use strict';
@@ -42,9 +42,15 @@
     return '∞';
   }
 
-  function fmtSci(x) {
-    if (!isFinite(x) || x <= 0) return '0';
-    return x.toExponential(2).replace('.', ',').replace('e', ' × 10^').replace('^+', '^');
+  /** Même format que le jeu : 344, 1,2 k, 6,9 Md… */
+  const UNIT_NAMES = Object.keys(UNITS);
+  function fmt(n) {
+    if (!isFinite(n)) return '∞';
+    if (Math.abs(n) < 1000) return Math.abs(n) < 10 && n % 1 ? n.toFixed(1).replace('.', ',') : String(Math.floor(n));
+    let i = 0;
+    while (Math.abs(n) >= 1000 && i < UNIT_NAMES.length - 1) { n /= 1000; i++; }
+    const s = n >= 100 ? Math.floor(n).toString() : (Math.floor(n * 10) / 10).toFixed(1).replace('.', ',').replace(/,0$/, '');
+    return `${s} ${UNIT_NAMES[i]}`;
   }
 
   /** Écart à l'optimum en ordres de grandeur → classe de couleur. */
@@ -86,19 +92,14 @@
 
       let time = '—', sub = '', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
       if (isFinite(r.ratio) && best > 0) {
-        const payback = 1 / r.ratio; // secondes pour rembourser l'achat
+        const pp = 1 / r.ratio; // prix ÷ production (plus petit = meilleur)
         const gap = Math.log10(best / r.ratio);
-        const rel = (r.ratio / best) * 100;
-        time = fmtDuration(payback);
-        sub = gap < 0.05 ? '★ meilleur'
-          : rel < 0.01 ? '< 0,01 % du top'
-          : `${rel >= 1 ? Math.round(rel) : rel.toFixed(rel >= 0.1 ? 1 : 2).replace('.', ',')} % du top`;
+        time = fmt(pp);
+        sub = gap < 0.05 ? '★ meilleur' : '';
         cls = tier(gap);
         title =
-          `Rentabilisé en ${fmtDuration(payback)}\n` +
-          `Gain : +${fmtSci(r.gain)} bits/s (${r.qty} × ${fmtSci(r.each)})\n` +
-          `Prix : ${fmtSci(r.cost)} bits\n` +
-          `Ratio bits/s ÷ prix : ${fmtSci(r.ratio)}`;
+          `Prix ÷ production = ${fmt(r.cost)} ÷ ${fmt(r.gain)}/s = ${fmt(pp)}\n` +
+          `(plus c'est petit, plus c'est rentable — ≈ ${fmtDuration(pp)} pour rembourser l'achat)`;
       }
 
       const t = badge.firstChild, s = badge.lastChild;
