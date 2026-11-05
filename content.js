@@ -314,6 +314,16 @@
       clearTimeout(svg._lteIntro);
       svg._lteIntro = setTimeout(() => svg.classList.remove('lte-ring-intro'), INTRO_MS);
     }
+    const prev = parseFloat(prog.getAttribute('stroke-dasharray'));
+    if (!intro && isFinite(prev) && p * 100 < prev - 0.05) {
+      // Le contour recule (unité suivante en mode Max, achat, prix qui monte) : il s'efface d'un coup,
+      // sans animation à rebours. On coupe la transition, on applique, puis on la rétablit.
+      svg.classList.add('lte-ring-snap');
+      prog.setAttribute('stroke-dasharray', dash);
+      getComputedStyle(prog).strokeDasharray;
+      svg.classList.remove('lte-ring-snap');
+      return;
+    }
     if (prog.getAttribute('stroke-dasharray') !== dash) prog.setAttribute('stroke-dasharray', dash);
   }
 

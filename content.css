@@ -87,6 +87,8 @@
 .lte-ring-intro .lte-ring-prog {
   transition: stroke-dasharray 0.9s cubic-bezier(0.22, 0.8, 0.3, 1);
 }
+/* Quand le contour recule, il s'efface d'un coup (pas d'animation à rebours) */
+.lte-ring-snap .lte-ring-prog { transition: none !important; }
 
 /* Machines restantes avant la prochaine amélioration, après le nom et le nombre */
 .lte-next {
