@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Labo Tycoon Helper",
   "version": "1.5.0",
-  "description": "Affiche à droite de chaque bâtiment de l'onglet Labo le ratio prix ÷ production (coloré du meilleur au pire achat) , la hausse de production en % et un score combiné (hausse % ÷ ratio).",
+  "description": "Affiche à droite de chaque bâtiment de l'onglet Labo le ratio prix ÷ production (coloré du meilleur au pire achat), la hausse de production en % et un score combiné (hausse % ÷ ratio).",
   "content_scripts": [
     {
       "matches": [
