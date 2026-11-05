@@ -115,3 +115,12 @@
   pointer-events: none;
 }
 .lte-eta[hidden] { display: none; }
+
+/* Bits/s des clics auto, à côté des bits/s du jeu */
+.lte-clickrate {
+  font-size: 0.85em;
+  font-weight: 600;
+  opacity: 0.75;
+  cursor: help;
+  white-space: nowrap;
+}

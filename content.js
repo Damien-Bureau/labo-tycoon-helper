@@ -106,12 +106,13 @@
     //   pay   = rentabilisé dans (s) = attente pour réunir le prix + temps pour que l'achat se rembourse
     //           (au rythme actuel, café et événements compris) — plus petit = mieux
     const bits = readBits();
-    const rate = parseNum(document.getElementById('tycRate')?.textContent);
+    const rate = parseNum(document.getElementById('tycRate')?.textContent); // production (café compris)
+    const income = incomeRate();                                             // + clics auto : vitesse de la cagnotte
     const boost = base > 0 && rate > 0 ? rate / base : 1;
     for (const r of rows) {
       if (!(r.gain > 0 && r.cost > 0 && isFinite(bits))) { r.pay = NaN; continue; }
       const missing = Math.max(0, r.cost - bits);
-      const wait = missing === 0 ? 0 : rate > 0 ? missing / rate : Infinity;
+      const wait = missing === 0 ? 0 : income > 0 ? missing / income : Infinity;
       r.pay = wait + r.cost / (r.gain * boost);
     }
     const maxOf = (k) => Math.max(0, ...rows.map((r) => (isFinite(r[k]) ? r[k] : 0)));
@@ -184,13 +185,13 @@
         const wait = Math.max(0, r.pay - r.cost / (r.gain * boost));
         yTitle =
           `Rentabilisé dans ${fmtDuration(r.pay)} = attente ${fmtDuration(wait)} + remboursement ${fmtDuration(r.pay - wait)}\n` +
-          `(au rythme actuel de ${fmt(rate)} bits/s, café et événements compris)`;
+          `(au rythme actuel de ${fmt(income)} bits/s, café, événements et clics auto compris)`;
       }
       setText(payEl, yText, yTitle);
       setTier(payEl, yCls);
 
       // Machines restantes avant la prochaine amélioration (après le nom)
-      updateNextTier(r, tiers, bits, rate);
+      updateNextTier(r, tiers, bits, income);
     }
     fitColumns(list, rows[0]);
     updateRings();
@@ -258,6 +259,19 @@
     const next = /prochain café dans ([\d:]+)/i.exec(t);
     setText(cof.lastChild, next ? `prochain dans ${next[1]}` : 'production × durée', '');
     cof.title = t;
+
+    // À côté des bits/s du jeu : bits/s des clics auto
+    const rateBox = document.getElementById('tycRate')?.parentElement;
+    if (rateBox) {
+      let cr = rateBox.querySelector(':scope > .lte-clickrate');
+      const clicks = autoClickRate();
+      if (!clicks) { cr?.remove(); }
+      else {
+        if (!cr) { cr = document.createElement('span'); cr.className = 'lte-clickrate'; rateBox.appendChild(cr); }
+        const prod = parseNum(document.getElementById('tycRate')?.textContent) || 0;
+        setText(cr, ` + ${fmt(clicks)}/s (clics auto)`, `Clics automatiques : ${fmt(clicks)} bits/s, non comptés dans les bits/s du jeu\nTotal : ${fmt(prod + clicks)} bits/s`);
+      }
+    }
   }
 
   /** Si les colonnes dépassent de l'écran, rétrécit les cartes du Labo juste assez pour les faire tenir. */
@@ -401,6 +415,19 @@
    * Le compteur du jeu est arrondi (« 1 Md » = entre 1,0 et 1,1 Md). On estime la vraie valeur :
    * elle avance au rythme affiché (bits/s) et reste dans l'intervalle compatible avec l'affichage ;
    * à chaque changement du chiffre affiché, l'estimation se recale exactement sur la nouvelle borne. */
+  /** Bits/s apportés par les clics automatiques : « +12,5 Md par clic · 🐒 3 clics/s auto » → 37,5 Md/s.
+   *  Ils ne sont pas comptés dans les bits/s affichés par le jeu. */
+  function autoClickRate() {
+    const t = document.getElementById('tycClickVal')?.textContent || '';
+    const per = parseNum((t.match(/([\d\s\u00a0\u202f.,]+\s*[A-Za-z]*)\s*par clic/) || [])[1]);
+    const n = parseFloat(((t.match(/([\d.,]+)\s*clics?\/s/) || [])[1] || '').replace(',', '.'));
+    return per > 0 && n > 0 ? per * n : 0;
+  }
+  /** Vitesse à laquelle la cagnotte monte : production (café compris) + clics auto. */
+  function incomeRate() {
+    return (parseNum(document.getElementById('tycRate')?.textContent) || 0) + autoClickRate();
+  }
+
   const bitsTracker = { est: NaN, t: 0 };
   /** Pas du dernier chiffre affiché : "1 Md" → 0,1 Md ; "4,9 Md" → 0,1 Md ; "368 M" → 1 M ; "12 345" → 1 */
   function displayStep(text) {
@@ -416,7 +443,7 @@
     const low = parseNum(text);
     if (!isFinite(low)) return NaN;
     const step = displayStep(text), high = low + step;
-    const rate = parseNum(document.getElementById('tycRate')?.textContent) || 0;
+    const rate = incomeRate();
     const now = performance.now(), T = bitsTracker;
     if (isFinite(T.est) && now - T.t < 5000) T.est += (rate * (now - T.t)) / 1000;
     else T.est = low;
@@ -485,7 +512,7 @@
     const list = document.getElementById('tycBuildings');
     if (!list || !list.offsetParent) return;
     const bits = readBits();
-    const rate = parseNum(document.getElementById('tycRate')?.textContent);
+    const rate = incomeRate();
     for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
       const btn = row.querySelector('.tyc-buy');
       if (!btn) continue;
@@ -503,7 +530,7 @@
       }
       el.hidden = false;
       const eta = missing / rate;
-      setText(el, `⏳ ${fmtClock(eta)}`, `Achetable dans ${fmtDuration(eta)} au rythme actuel (${fmt(rate)} bits/s)`);
+      setText(el, `⏳ ${fmtClock(eta)}`, `Achetable dans ${fmtDuration(eta)} au rythme actuel (${fmt(rate)} bits/s, clics auto compris)`);
     }
   }
 
@@ -555,7 +582,7 @@
     document.querySelectorAll('.lte-eta-on').forEach((el) => el.classList.remove('lte-eta-on'));
   };
   const removeStats = () => {
-    document.querySelectorAll('.lte-extra').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-extra, .lte-clickrate').forEach((el) => el.remove());
     extrasAt = 0;
   };
   const removeRings = () => {
