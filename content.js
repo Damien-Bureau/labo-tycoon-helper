@@ -109,7 +109,7 @@
       list.querySelectorAll('.lte-head').forEach((el) => el.remove());
       const head = document.createElement('span');
       head.className = 'lte-head';
-      head.innerHTML = '<span>Ratio prix/production</span><span>Hausse de la prod</span><span>Prix d’1 % de hausse</span>';
+      head.innerHTML = '<span>Prix d’1 bit/s</span><span>Hausse de la prod</span><span>Prix d’1 % de hausse</span>';
       rows[0].row.appendChild(head);
     }
 
