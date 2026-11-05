@@ -51,19 +51,13 @@
   overflow: visible;
   pointer-events: none;
 }
-.lte-ring rect {
-  x: 1px;
-  y: 1px;
-  width: calc(100% - 2px);
-  height: calc(100% - 2px);
-  rx: 11px;
-  ry: 11px;
+.lte-ring path {
   fill: none;
   stroke-width: 2px;
 }
+.lte-ring-hidden { display: none; }
 .lte-ring-track { stroke: rgba(74, 88, 184, 0.18); }
 .lte-ring-prog {
   stroke: #4a58b8;
-  transition: stroke-dasharray 0.3s linear;
+  transition: stroke-dasharray 0.15s linear;
 }
-.lte-ring-full .lte-ring-prog { stroke: #16a34a; }

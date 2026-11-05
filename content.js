@@ -77,7 +77,7 @@
 
   function update() {
     const list = document.getElementById('tycBuildings');
-    if (!list || !list.offsetParent) return; // onglet Labo fermé / non visible
+    if (!list || document.hidden || !list.offsetParent) return; // onglet Labo fermé / page en arrière-plan
 
     const bits = parseNum(document.getElementById('tycBits')?.textContent); // cagnotte actuelle
     const rows = [];
@@ -156,7 +156,16 @@
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  /** Dessine (ou met à jour) l'anneau de progression autour d'un bouton d'achat. */
+
+  /** Contour arrondi qui part du milieu en haut et tourne dans le sens horaire. */
+  function ringPath(w, h) {
+    const i = 1, r = 10; // trait centré à 1 px du bord, rayon = bordure du bouton (11 px) − 1
+    const L = i, T = i, R = w - i, B = h - i, cx = w / 2;
+    return `M${cx},${T} H${R - r} A${r},${r} 0 0 1 ${R},${T + r} V${B - r} A${r},${r} 0 0 1 ${R - r},${B} ` +
+      `H${L + r} A${r},${r} 0 0 1 ${L},${B - r} V${T + r} A${r},${r} 0 0 1 ${L + r},${T} Z`;
+  }
+
+  /** Contour de progression autour d'un bouton d'achat : cagnotte ÷ prix. Masqué dès que l'achat est possible. */
   function updateRing(btn, bits, cost) {
     if (!btn) return;
     let svg = btn.querySelector(':scope > svg.lte-ring');
@@ -165,21 +174,40 @@
       svg.setAttribute('class', 'lte-ring');
       svg.setAttribute('aria-hidden', 'true');
       for (const cls of ['lte-ring-track', 'lte-ring-prog']) {
-        const rect = document.createElementNS(SVG_NS, 'rect');
-        rect.setAttribute('class', cls);
-        rect.setAttribute('pathLength', '100');
-        svg.appendChild(rect);
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('class', cls);
+        path.setAttribute('pathLength', '100');
+        svg.appendChild(path);
       }
       btn.appendChild(svg);
       btn.classList.add('lte-ring-on');
     }
     const p = isFinite(bits) && isFinite(cost) && cost > 0 ? Math.max(0, Math.min(1, bits / cost)) : 0;
-    const dash = `${(p * 100).toFixed(2)} 100`;
+    const full = p >= 1;
+    if (svg.classList.contains('lte-ring-hidden') !== full) svg.classList.toggle('lte-ring-hidden', full);
+    if (full) return; // achat possible : on laisse le bouton tel que le site l'affiche
+
+    // (Re)calcule le tracé si la taille du bouton a changé
+    const w = btn.offsetWidth, h = btn.offsetHeight, size = `${w}x${h}`;
+    if (svg.dataset.size !== size && w && h) {
+      svg.dataset.size = size;
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      const d = ringPath(w, h);
+      for (const path of svg.children) path.setAttribute('d', d);
+    }
+    const dash = `${(p * 100).toFixed(1)} 100`;
     const prog = svg.lastChild;
     if (prog.getAttribute('stroke-dasharray') !== dash) prog.setAttribute('stroke-dasharray', dash);
-    svg.classList.toggle('lte-ring-full', p >= 1);
-    const pctTxt = isFinite(bits) && cost > 0 ? `Cagnotte : ${fmt(bits)} / ${fmt(cost)} (${Math.floor(Math.min(1, bits / cost) * 100)} %)` : '';
-    if (pctTxt && btn.title !== pctTxt) btn.title = pctTxt;
+  }
+
+  /** Mise à jour légère des seuls contours (appelée à chaque changement de la cagnotte). */
+  function updateRings() {
+    const list = document.getElementById('tycBuildings');
+    if (!list || document.hidden) return;
+    const bits = parseNum(document.getElementById('tycBits')?.textContent);
+    for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
+      updateRing(row.querySelector('.tyc-buy'), bits, parseNum(row.querySelector('.tyc-buyc')?.textContent));
+    }
   }
 
   function setText(el, text, title) {
@@ -193,20 +221,25 @@
   // Le jeu réécrit la liste à chaque achat (innerHTML) : on réinjecte immédiatement,
   // dans la même frame (les callbacks de MutationObserver passent avant le rendu),
   // pour éviter que les nombres disparaissent puis réapparaissent.
-  let scheduled = false;
+  // Le jeu (tick toutes les 125 ms) réécrit la cagnotte et la liste. On regroupe toutes les
+  // mutations d'un même tick en une seule mise à jour (microtâche, avant le rendu) :
+  //   - la liste a changé (achat, prix…) → mise à jour complète ;
+  //   - seule la cagnotte a changé       → mise à jour légère des contours.
+  let pendingFull = false, pendingRings = false, scheduled = false;
   const observer = new MutationObserver((mutations) => {
-    if (scheduled) return;
-    const relevant = mutations.some((m) => {
+    for (const m of mutations) {
       const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      return el && !el.closest('.lte-side, .lte-ring') &&
-        (el.id === 'tycBuildings' || el.closest('#tycBuildings') || el.closest('#tycBits'));
-    });
-    if (!relevant) return;
+      if (!el || el.closest('.lte-side, .lte-ring')) continue;
+      if (el.id === 'tycBuildings' || el.closest('#tycBuildings')) pendingFull = true;
+      else if (el.closest('#tycBits')) pendingRings = true;
+    }
+    if (scheduled || !(pendingFull || pendingRings)) return;
     scheduled = true;
     queueMicrotask(() => {
-      scheduled = false;
+      const full = pendingFull;
+      scheduled = pendingFull = pendingRings = false;
       observer.disconnect();
-      try { update(); } finally { observe(); }
+      try { full ? update() : updateRings(); } finally { observe(); }
     });
   });
   const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
