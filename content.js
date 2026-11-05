@@ -76,6 +76,7 @@
   const TIERS = ['lte-best', 'lte-good', 'lte-mid', 'lte-bad', 'lte-awful'];
 
   function update() {
+    updateExtras();
     const list = document.getElementById('tycBuildings');
     if (!cfg.indicators || !list || document.hidden || !list.offsetParent) { updateRings(); return; } // indicateurs masqués / Labo non affiché
 
@@ -193,6 +194,57 @@
     }
     fitColumns(list, rows[0]);
     updateRings();
+  }
+
+  /* ---- Panneau de gauche : durée hors ligne max et café ----
+   * Hors ligne : le serveur n'envoie pas le maximum. Base 12 h (message « Pendant ton absence » du jeu)
+   * + bonus obtenus : améliorations installées, R&D terminées, composants trouvés (« Production hors ligne : +N h »).
+   * Café : le jeu met multiplicateur et durée dans l'info-bulle du bouton café. */
+  const OFFLINE_BASE_H = 12;
+  let extrasAt = 0;
+  function updateExtras() {
+    if (!cfg.indicators || document.hidden) return;
+    const now = performance.now();
+    if (now - extrasAt < 1000) return; // 1 fois par seconde suffit
+    extrasAt = now;
+    const mini = document.getElementById('tycMini');
+    if (!mini) return;
+    let box = mini.parentElement.querySelector(':scope > .lte-extra');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'tyc-mini lte-extra';
+      box.innerHTML =
+        '<div title=""><span class="muted small">Hors ligne max</span><b></b><span class="muted small"></span></div>' +
+        '<div title=""><span class="muted small">Café</span><b></b><span class="muted small"></span></div>';
+      mini.after(box);
+    }
+    const [off, cof] = box.children;
+
+    // Hors ligne
+    const bonus = [];
+    const add = (label, text) => {
+      const m = /Production hors ligne\s*:\s*\+\s*(\d+(?:[.,]\d+)?)\s*h/i.exec(text || '');
+      if (m) bonus.push({ label, h: parseFloat(m[1].replace(',', '.')) });
+    };
+    for (const el of document.querySelectorAll('#tycUpgrades .tyc-owned [title]')) add(el.title.split(' — ')[0], el.title);
+    for (const el of document.querySelectorAll('.tyc-rdn.owned')) add(el.querySelector('b')?.textContent || 'R&D', el.textContent);
+    for (const el of document.querySelectorAll('.tyc-a.got')) add(el.querySelector('b')?.textContent || 'Composant', el.title);
+    const extra = bonus.reduce((t, b) => t + b.h, 0);
+    const fmtH = (h) => `${String(Math.round(h * 10) / 10).replace('.', ',')} h`;
+    setText(off.querySelector('b'), fmtH(OFFLINE_BASE_H + extra), '');
+    setText(off.lastChild, extra ? `${fmtH(OFFLINE_BASE_H)} + ${fmtH(extra)} de bonus` : 'base, sans bonus', '');
+    off.title =
+      `Production hors ligne maximale (estimée)\n• Base : ${fmtH(OFFLINE_BASE_H)}\n` +
+      bonus.map((b) => `• ${b.label} : +${fmtH(b.h)}`).join('\n') +
+      '\n\nLa base de 12 h vient du message « Pendant ton absence » du jeu ; le serveur ne donne pas le total.';
+
+    // Café
+    const t = document.getElementById('tycCoffee')?.title || '';
+    const m = /×\s*([\d.,]+)\s*pendant\s*([\d.,]+)\s*min/i.exec(t);
+    setText(cof.querySelector('b'), m ? `×${m[1]} · ${m[2].replace('.', ',')} min` : '—', '');
+    const next = /prochain café dans ([\d:]+)/i.exec(t);
+    setText(cof.lastChild, next ? `prochain dans ${next[1]}` : 'production × durée', '');
+    cof.title = t;
   }
 
   /** Si les colonnes dépassent de l'écran, rétrécit les cartes du Labo juste assez pour les faire tenir. */
@@ -443,7 +495,8 @@
   let running = false, timer = null;
 
   const removeIndicators = () => {
-    document.querySelectorAll('.lte-side, .lte-head, .lte-next').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-side, .lte-head, .lte-next, .lte-extra').forEach((el) => el.remove());
+    extrasAt = 0;
     document.getElementById('tycBuildings')?.style.removeProperty('--lte-shrink');
     document.querySelectorAll('.lte-on').forEach((el) => el.classList.remove('lte-on'));
   };
