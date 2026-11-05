@@ -232,11 +232,22 @@
     for (const el of document.querySelectorAll('.tyc-rdn.owned')) add(el.querySelector('b')?.textContent || 'R&D', el.textContent);
     for (const el of document.querySelectorAll('.tyc-a.got')) add(el.querySelector('b')?.textContent || 'Composant', el.title);
     const extra = bonus.reduce((t, b) => t + b.h, 0);
+    const hours = OFFLINE_BASE_H + extra;
     const fmtH = (h) => `${String(Math.round(h * 10) / 10).replace('.', ',')} h`;
-    setText(off.querySelector('b'), fmtH(OFFLINE_BASE_H + extra), '');
-    setText(off.lastChild, extra ? `${fmtH(OFFLINE_BASE_H)} + ${fmtH(extra)} de bonus` : 'base, sans bonus', '');
+    // Bits produits pendant ce temps : production de base (sans café ni événement, qui ne durent pas)
+    let base = 0;
+    for (const row of document.querySelectorAll('#tycBuildings .tyc-b[data-b]')) {
+      if (!(row.querySelector('.tyc-cnt')?.textContent || '').trim()) continue;
+      const tot = parseNum(row.querySelector('.tyc-bt .muted.small')?.textContent);
+      if (isFinite(tot)) base += tot;
+    }
+    const offBits = base * hours * 3600;
+    setText(off.querySelector('b'), fmtH(hours), '');
+    setText(off.lastChild, base > 0 ? `≈ ${fmt(offBits)} bits` : `${fmtH(OFFLINE_BASE_H)} + ${fmtH(extra)} de bonus`, '');
     off.title =
-      `Production hors ligne maximale (estimée)\n• Base : ${fmtH(OFFLINE_BASE_H)}\n` +
+      `Production hors ligne maximale (estimée) : ${fmtH(hours)}` +
+      (base > 0 ? `\n≈ ${fmt(offBits)} bits à ${fmt(base)} bits/s (production de base, sans café ni événement)` : '') +
+      `\n\n• Base : ${fmtH(OFFLINE_BASE_H)}\n` +
       bonus.map((b) => `• ${b.label} : +${fmtH(b.h)}`).join('\n') +
       '\n\nLa base de 12 h vient du message « Pendant ton absence » du jeu ; le serveur ne donne pas le total.';
 
