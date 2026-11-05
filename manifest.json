@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Labo Tycoon Helper",
-  "version": "1.14.2",
+  "version": "1.14.3",
   "description": "Affiche à droite de chaque bâtiment de l'onglet Labo le ratio prix ÷ production (coloré du meilleur au pire achat), la hausse de production en % et le rapport prix d’un bit/s ÷ hausse %.",
   "icons": {
     "16": "icons/icon16.png",

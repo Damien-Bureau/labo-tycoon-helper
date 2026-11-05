@@ -27,7 +27,8 @@
 /* Largeurs fixes pour que les colonnes (et leurs titres) restent alignées */
 .lte-badge, .lte-head > :nth-child(1) { width: 64px; }
 .lte-pct,   .lte-head > :nth-child(2) { width: 76px; }
-.lte-head > :nth-child(3)             { width: 80px; }
+.lte-score, .lte-head > :nth-child(3) { width: 80px; }
+.lte-badge, .lte-pct, .lte-score { text-align: center; } /* centrés sous leur titre */
 
 /* Titres des colonnes, au-dessus de la première ligne */
 .lte-head {
