@@ -104,6 +104,15 @@
     const best = maxOf('ratio'), bestPct = maxOf('pct');
     const bestScore = Math.min(...rows.map((r) => (isFinite(r.score) && r.score > 0 ? r.score : Infinity)));
 
+    // Titres des colonnes, au-dessus de la première ligne
+    if (rows[0] && !rows[0].row.querySelector(':scope > .lte-head')) {
+      list.querySelectorAll('.lte-head').forEach((el) => el.remove());
+      const head = document.createElement('span');
+      head.className = 'lte-head';
+      head.innerHTML = '<span>Ratio prix/production</span><span>Hausse de la prod</span><span>Prix d’1 % de hausse</span>';
+      rows[0].row.appendChild(head);
+    }
+
     for (const r of rows) {
       let side = r.row.querySelector(':scope > .lte-side');
       if (!side || side.children.length !== 3) {
@@ -227,9 +236,6 @@
     if (!el.classList.contains(cls)) { el.classList.remove('lte-na', ...TIERS); el.classList.add(cls); }
   }
 
-  // Le jeu réécrit la liste à chaque achat (innerHTML) : on réinjecte immédiatement,
-  // dans la même frame (les callbacks de MutationObserver passent avant le rendu),
-  // pour éviter que les nombres disparaissent puis réapparaissent.
   // Le jeu (tick toutes les 125 ms) réécrit la cagnotte et la liste. On regroupe toutes les
   // mutations d'un même tick en une seule mise à jour (microtâche, avant le rendu) :
   //   - la liste a changé (achat, prix…) → mise à jour complète ;
@@ -238,7 +244,7 @@
   const observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      if (!el || el.closest('.lte-side, .lte-ring')) continue;
+      if (!el || el.closest('.lte-side, .lte-ring, .lte-head')) continue;
       if (el.id === 'tycBuildings' || el.closest('#tycBuildings')) pendingFull = true;
       else if (el.closest('#tycBits') || el.closest('#tycUpgrades')) pendingRings = true;
     }
@@ -261,7 +267,7 @@
   let running = false, timer = null;
 
   const removeIndicators = () => {
-    document.querySelectorAll('.lte-side').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-side, .lte-head').forEach((el) => el.remove());
     document.querySelectorAll('.lte-on').forEach((el) => el.classList.remove('lte-on'));
   };
   const removeRings = () => {

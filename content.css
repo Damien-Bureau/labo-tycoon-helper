@@ -11,7 +11,7 @@
   transform: translateY(-50%);
   display: flex;
   align-items: baseline;
-  gap: 14px;
+  gap: 10px;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
   font-weight: 700;
@@ -24,9 +24,26 @@
   cursor: help;
 }
 
-/* Largeurs fixes pour que les colonnes restent alignées */
-.lte-badge { min-width: 74px; }
-.lte-pct   { min-width: 84px; }
+/* Largeurs fixes pour que les colonnes (et leurs titres) restent alignées */
+.lte-badge, .lte-head > :nth-child(1) { width: 64px; }
+.lte-pct,   .lte-head > :nth-child(2) { width: 76px; }
+.lte-head > :nth-child(3)             { width: 80px; }
+
+/* Titres des colonnes, au-dessus de la première ligne */
+.lte-head {
+  position: absolute;
+  left: calc(100% + 12px);
+  bottom: calc(100% + 5px);
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #858999;
+  pointer-events: none;
+}
 
 /* Ratio prix ÷ production et score : vert = meilleur achat, rouge = le plus cher */
 .lte-best  { color: #15803d; }
