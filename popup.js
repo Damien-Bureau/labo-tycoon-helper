@@ -1,18 +1,46 @@
-// Popup : active / désactive l'extension. L'état est partagé avec content.js via chrome.storage.local.
-const toggle = document.getElementById('toggle');
-const status = document.getElementById('status');
+// Popup : réglages partagés avec content.js via chrome.storage.local.
+//   indicators : afficher les indicateurs (onglet Labo)
+//   rings      : afficher les contours des boutons d'achat (Labo + Améliorer)
+// content.js réagit immédiatement, sans recharger la page.
+const DEFAULTS = { indicators: true, rings: true };
+const KEYS = Object.keys(DEFAULTS);
+
+const all = document.getElementById('all');
+const allHint = document.getElementById('allHint');
+const toggles = Object.fromEntries(KEYS.map((k) => [k, document.getElementById(k)]));
+let cfg = { ...DEFAULTS };
 
 document.getElementById('version').textContent = `v${chrome.runtime.getManifest().version}`;
 
-function render(enabled) {
-  toggle.checked = enabled;
-  status.textContent = enabled ? 'Indicateurs et contours affichés' : 'Le jeu est affiché tel quel';
+function render() {
+  for (const k of KEYS) toggles[k].checked = cfg[k];
+  const on = KEYS.filter((k) => cfg[k]).length;
+  all.checked = on === KEYS.length;
+  all.indeterminate = on > 0 && on < KEYS.length;
+  allHint.textContent = on === KEYS.length ? 'Tout est affiché' : on === 0 ? 'Le jeu est affiché tel quel' : 'Partiellement activé';
 }
 
-chrome.storage.local.get({ enabled: true }, (st) => render(st.enabled));
+function save(next) {
+  cfg = { ...cfg, ...next };
+  render();
+  chrome.storage.local.set(next);
+}
 
-toggle.addEventListener('change', () => {
-  const enabled = toggle.checked;
-  render(enabled);
-  chrome.storage.local.set({ enabled }); // content.js réagit immédiatement, sans recharger la page
+chrome.storage.local.get(null, (st) => {
+  // Ancienne version : un seul interrupteur « enabled »
+  if (typeof st.enabled === 'boolean' && st.indicators === undefined && st.rings === undefined) {
+    st.indicators = st.rings = st.enabled;
+  }
+  for (const k of KEYS) if (typeof st[k] === 'boolean') cfg[k] = st[k];
+  render();
 });
+
+// Interrupteur général : si tout est activé → tout désactiver, sinon → tout activer
+all.addEventListener('change', () => {
+  const allOn = KEYS.every((k) => cfg[k]);
+  save(Object.fromEntries(KEYS.map((k) => [k, !allOn])));
+});
+
+for (const k of KEYS) {
+  toggles[k].addEventListener('change', () => save({ [k]: toggles[k].checked }));
+}

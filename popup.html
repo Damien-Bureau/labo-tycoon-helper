@@ -14,14 +14,33 @@
     </div>
   </header>
 
-  <label class="row" for="toggle">
+  <label class="row master" for="all">
     <span>
-      <b>Activer l'extension</b>
-      <span class="hint" id="status">…</span>
+      <b>Tout activer</b>
+      <span class="hint" id="allHint">…</span>
     </span>
-    <input type="checkbox" id="toggle" role="switch">
+    <input type="checkbox" id="all" role="switch">
     <span class="switch" aria-hidden="true"></span>
   </label>
+
+  <div class="group">
+    <label class="row" for="indicators">
+      <span>
+        <b>Afficher les indicateurs</b>
+        <span class="hint">Prix d'un bit/s, hausse %, rapport</span>
+      </span>
+      <input type="checkbox" id="indicators" role="switch">
+      <span class="switch" aria-hidden="true"></span>
+    </label>
+    <label class="row" for="rings">
+      <span>
+        <b>Afficher les contours des boutons d'achat</b>
+        <span class="hint">Progression de la cagnotte vers le prix</span>
+      </span>
+      <input type="checkbox" id="rings" role="switch">
+      <span class="switch" aria-hidden="true"></span>
+    </label>
+  </div>
 
   <script src="popup.js"></script>
 </body>

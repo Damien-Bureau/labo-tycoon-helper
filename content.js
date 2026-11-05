@@ -77,7 +77,7 @@
 
   function update() {
     const list = document.getElementById('tycBuildings');
-    if (!list || document.hidden || !list.offsetParent) { updateRings(); return; } // Labo non affiché
+    if (!cfg.indicators || !list || document.hidden || !list.offsetParent) { updateRings(); return; } // indicateurs masqués / Labo non affiché
 
     const rows = [];
     let base = 0; // production de base = somme des bits/s de chaque bâtiment (hors bonus temporaires)
@@ -201,7 +201,7 @@
 
   /** Mise à jour légère des seuls contours, onglets Labo et Améliorer (à chaque changement de la cagnotte). */
   function updateRings() {
-    if (document.hidden) return;
+    if (!cfg.rings || document.hidden) return;
     const bits = parseNum(document.getElementById('tycBits')?.textContent);
     // Labo : prix affiché dans le bouton (suit ×1 / ×10 / Max)
     const list = document.getElementById('tycBuildings');
@@ -247,37 +247,59 @@
     queueMicrotask(() => {
       const full = pendingFull;
       scheduled = pendingFull = pendingRings = false;
-      if (!enabled) return;
+      if (!running) return;
       observer.disconnect();
-      try { full ? update() : updateRings(); } finally { if (enabled) observe(); }
+      try { full ? update() : updateRings(); } finally { if (running) observe(); }
     });
   });
   const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-  /* ------------------------- Activation (popup) ------------------------- */
-  // L'état est stocké dans chrome.storage.local sous la clé « enabled » (true par défaut).
-  let enabled = false, timer = null;
+  /* ------------------------- Réglages (popup) ------------------------- */
+  // chrome.storage.local : { indicators: bool, rings: bool } (tous deux true par défaut).
+  const DEFAULTS = { indicators: true, rings: true };
+  let cfg = { indicators: false, rings: false };
+  let running = false, timer = null;
 
-  function start() {
-    if (enabled) return;
-    enabled = true;
-    observe();
-    timer = setInterval(update, 1000); // filet de sécurité
-    update();
+  const removeIndicators = () => {
+    document.querySelectorAll('.lte-side').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-on').forEach((el) => el.classList.remove('lte-on'));
+  };
+  const removeRings = () => {
+    document.querySelectorAll('.lte-ring').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-ring-on').forEach((el) => el.classList.remove('lte-ring-on'));
+  };
+
+  /** Applique les réglages : retire ce qui est désactivé, démarre / arrête la surveillance de la page. */
+  function applyConfig(next) {
+    cfg = { ...cfg, ...next };
+    if (!cfg.indicators) removeIndicators();
+    if (!cfg.rings) removeRings();
+    const active = cfg.indicators || cfg.rings;
+    if (active && !running) {
+      running = true;
+      observe();
+      timer = setInterval(update, 1000); // filet de sécurité
+    } else if (!active && running) {
+      running = false;
+      observer.disconnect();
+      clearInterval(timer);
+    }
+    if (running) update();
   }
 
-  /** Retire tout ce que l'extension a ajouté : la page redevient exactement celle du site. */
-  function stop() {
-    if (!enabled) return;
-    enabled = false;
-    observer.disconnect();
-    clearInterval(timer);
-    document.querySelectorAll('.lte-side, .lte-ring').forEach((el) => el.remove());
-    document.querySelectorAll('.lte-on, .lte-ring-on').forEach((el) => el.classList.remove('lte-on', 'lte-ring-on'));
-  }
-
-  chrome.storage.local.get({ enabled: true }, (st) => (st.enabled ? start() : stop()));
+  chrome.storage.local.get(null, (st) => {
+    // Ancienne version : un seul interrupteur « enabled »
+    if (typeof st.enabled === 'boolean' && st.indicators === undefined && st.rings === undefined) {
+      st.indicators = st.rings = st.enabled;
+      chrome.storage.local.set({ indicators: st.enabled, rings: st.enabled });
+      chrome.storage.local.remove('enabled');
+    }
+    applyConfig({ ...DEFAULTS, ...st });
+  });
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.enabled) (changes.enabled.newValue === false ? stop() : start());
+    if (area !== 'local') return;
+    const next = {};
+    for (const k of Object.keys(DEFAULTS)) if (changes[k]) next[k] = changes[k].newValue ?? DEFAULTS[k];
+    if (Object.keys(next).length) applyConfig(next);
   });
 })();
