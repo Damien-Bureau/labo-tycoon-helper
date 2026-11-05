@@ -85,12 +85,14 @@
       const each = parseNum(row.querySelector('.tyc-each')?.textContent);
       const cost = parseNum(row.querySelector('.tyc-buyc')?.textContent);
       const qty = parseQty(row.querySelector('.tyc-buyl')?.textContent);
-      const owned = (row.querySelector('.tyc-cnt')?.textContent || '').trim() !== '';
-      const total = owned ? parseNum(row.querySelector('.tyc-bt .muted.small')?.textContent) : 0;
+      const count = Number((row.querySelector('.tyc-cnt')?.textContent || '').trim()) || 0;
+      const total = count ? parseNum(row.querySelector('.tyc-bt .muted.small')?.textContent) : 0;
       if (isFinite(total)) base += total;
+      const name = (row.querySelector('.tyc-bt b')?.firstChild?.textContent || '').trim();
       const gain = each * qty; // bits/s ajoutés par cet achat
       const ratio = gain > 0 && cost > 0 ? gain / cost : NaN; // (bits/s) par bit dépensé
-      rows.push({ row, each, cost, qty, gain, ratio });
+      const unit = isFinite(cost) ? (cost * (GROWTH - 1)) / (GROWTH ** qty - 1) : NaN; // prix du prochain bâtiment
+      rows.push({ row, name, count, each, cost, qty, gain, ratio, unit });
     }
 
     // Indicateurs par ligne :
@@ -100,30 +102,43 @@
       r.pct = isFinite(r.gain) && r.gain > 0 && base > 0 ? (r.gain / base) * 100 : NaN;
       r.score = isFinite(r.pct) && r.pct > 0 && isFinite(r.ratio) ? 1 / r.ratio / r.pct : NaN;
     }
+    //   pay   = rentabilisé dans (s) = attente pour réunir le prix + temps pour que l'achat se rembourse
+    //           (au rythme actuel, café et événements compris) — plus petit = mieux
+    const bits = readBits();
+    const rate = parseNum(document.getElementById('tycRate')?.textContent);
+    const boost = base > 0 && rate > 0 ? rate / base : 1;
+    for (const r of rows) {
+      if (!(r.gain > 0 && r.cost > 0 && isFinite(bits))) { r.pay = NaN; continue; }
+      const missing = Math.max(0, r.cost - bits);
+      const wait = missing === 0 ? 0 : rate > 0 ? missing / rate : Infinity;
+      r.pay = wait + r.cost / (r.gain * boost);
+    }
     const maxOf = (k) => Math.max(0, ...rows.map((r) => (isFinite(r[k]) ? r[k] : 0)));
+    const minOf = (k) => Math.min(...rows.map((r) => (isFinite(r[k]) && r[k] > 0 ? r[k] : Infinity)));
     const best = maxOf('ratio'), bestPct = maxOf('pct');
-    const bestScore = Math.min(...rows.map((r) => (isFinite(r.score) && r.score > 0 ? r.score : Infinity)));
+    const bestScore = minOf('score'), bestPay = minOf('pay');
+    const tiers = readTiers();
 
     // Titres des colonnes, au-dessus de la première ligne
-    if (rows[0] && !rows[0].row.querySelector(':scope > .lte-head')) {
+    if (rows[0] && rows[0].row.querySelector(':scope > .lte-head')?.children.length !== 4) {
       list.querySelectorAll('.lte-head').forEach((el) => el.remove());
       const head = document.createElement('span');
       head.className = 'lte-head';
-      head.innerHTML = '<span>Prix d’1 bit/s</span><span>Hausse de<br>la prod</span><span>Prix d’1 % de hausse</span>';
+      head.innerHTML = '<span>Prix d’1 bit/s</span><span>Hausse de<br>la prod</span><span>Prix d’1 % de hausse</span><span>Rentabilisé<br>dans</span>';
       rows[0].row.appendChild(head);
     }
 
     for (const r of rows) {
       let side = r.row.querySelector(':scope > .lte-side');
-      if (!side || side.children.length !== 3) {
+      if (!side || side.children.length !== 4) {
         side?.remove();
         side = document.createElement('span');
         side.className = 'lte-side';
-        side.innerHTML = '<span class="lte-badge"></span><span class="lte-pct"></span><span class="lte-score"></span>';
+        side.innerHTML = '<span class="lte-badge"></span><span class="lte-pct"></span><span class="lte-score"></span><span class="lte-pay"></span>';
         r.row.appendChild(side);
         r.row.classList.add('lte-on');
       }
-      const [badge, pctEl, scoreEl] = side.children;
+      const [badge, pctEl, scoreEl, payEl] = side.children;
 
       // 1) Ratio prix ÷ production (plus petit = meilleur)
       let text = '—', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
@@ -157,8 +172,76 @@
       }
       setText(scoreEl, sText, sTitle);
       setTier(scoreEl, sCls);
+
+      // 4) Rentabilisé dans : attente + remboursement (plus petit = meilleur)
+      let yText = '—', yCls = 'lte-na', yTitle = 'Prix, production ou cagnotte illisible';
+      if (isFinite(r.pay) && r.pay > 0 && isFinite(bestPay)) {
+        yCls = tier(Math.log10(r.pay / bestPay));
+        yText = `${fmtDuration(r.pay)}${yCls === 'lte-best' ? ' ★' : ''}`;
+        const wait = Math.max(0, r.pay - r.cost / (r.gain * boost));
+        yTitle =
+          `Rentabilisé dans ${fmtDuration(r.pay)} = attente ${fmtDuration(wait)} + remboursement ${fmtDuration(r.pay - wait)}\n` +
+          `(au rythme actuel de ${fmt(rate)} bits/s, café et événements compris)`;
+      }
+      setText(payEl, yText, yTitle);
+      setTier(payEl, yCls);
+
+      // Machines restantes avant la prochaine amélioration (après le nom)
+      updateNextTier(r, tiers);
     }
+    fitColumns(list, rows[0]);
     updateRings();
+  }
+
+  /** Si les colonnes dépassent de l'écran, rétrécit les cartes du Labo juste assez pour les faire tenir. */
+  function fitColumns(list, first) {
+    const side = first?.row.querySelector(':scope > .lte-side');
+    if (!side) return;
+    const current = parseFloat(list.style.getPropertyValue('--lte-shrink')) || 0;
+    const naturalRight = first.row.getBoundingClientRect().right + current; // bord droit sans rétrécissement
+    const need = 12 + side.offsetWidth + 16; // écart + colonnes + marge
+    const shrink = Math.max(0, Math.ceil(naturalRight + need - document.documentElement.clientWidth));
+    if (Math.abs(shrink - current) >= 1) list.style.setProperty('--lte-shrink', `${shrink}px`);
+  }
+
+  /* ---- Prochaine amélioration de machine ----
+   * Paliers vérifiés dans le jeu : 1, 5, 25, 50, 100, 150 machines. Au-delà ils varient : on lit les paliers
+   * exacts dans les améliorations « Bientôt » (« 🔒 150 Raspberry Pi ») et on les retient (chrome.storage). */
+  const BASE_TIERS = [1, 5, 25, 50, 100, 150];
+  let learnedTiers = {}; // { "Raspberry Pi": [150, 300], … }
+  function readTiers() {
+    let changed = false;
+    for (const el of document.querySelectorAll('#tycUpgrades .tyc-u.locked .tyc-uc')) {
+      const m = el.textContent.replace(/^[^\d]*/, '').match(/^(\d+)\s+(.+?)\s*$/);
+      if (!m || m[2].includes('+')) continue; // seulement « N Machine » (pas les combinaisons « A + B »)
+      const n = Number(m[1]), name = m[2];
+      const list = (learnedTiers[name] ||= []);
+      if (!list.includes(n)) { list.push(n); list.sort((x, y) => x - y); changed = true; }
+    }
+    if (changed) chrome.storage.local.set({ tiers: learnedTiers });
+    return learnedTiers;
+  }
+  function updateNextTier(r, tiers) {
+    const nameEl = r.row.querySelector('.tyc-bt b');
+    if (!nameEl) return;
+    let el = nameEl.querySelector(':scope > .lte-next');
+    const learned = (tiers[r.name] || []).filter((n) => n > r.count);
+    const guessed = BASE_TIERS.filter((n) => n > r.count);
+    const target = Math.min(...learned, ...guessed);
+    if (!isFinite(target) || !isFinite(r.unit)) { el?.remove(); return; }
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'lte-next';
+      nameEl.appendChild(el);
+    }
+    const n = target - r.count;
+    const price = (r.unit * (GROWTH ** n - 1)) / (GROWTH - 1);
+    setText(
+      el,
+      `(${n} restante${n > 1 ? 's' : ''} · ${fmt(price)})`,
+      `Prochaine amélioration à ${target} ${r.name} : encore ${n} à acheter pour ${fmt(price)} bits` +
+        (learned.includes(target) ? '' : '\n(palier habituel du jeu, non encore confirmé pour cette machine)')
+    );
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -310,7 +393,7 @@
   const observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      if (!el || el.closest('.lte-side, .lte-ring, .lte-head')) continue;
+      if (!el || el.closest('.lte-side, .lte-ring, .lte-head, .lte-next')) continue;
       if (el.id === 'tycBuildings' || el.closest('#tycBuildings')) pendingFull = true;
       else if (el.closest('#tycBits') || el.closest('#tycUpgrades')) pendingRings = true;
     }
@@ -333,7 +416,8 @@
   let running = false, timer = null;
 
   const removeIndicators = () => {
-    document.querySelectorAll('.lte-side, .lte-head').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-side, .lte-head, .lte-next').forEach((el) => el.remove());
+    document.getElementById('tycBuildings')?.style.removeProperty('--lte-shrink');
     document.querySelectorAll('.lte-on').forEach((el) => el.classList.remove('lte-on'));
   };
   const removeRings = () => {
@@ -367,6 +451,7 @@
       chrome.storage.local.set({ indicators: st.enabled, rings: st.enabled });
       chrome.storage.local.remove('enabled');
     }
+    learnedTiers = st.tiers || {};
     applyConfig({ ...DEFAULTS, ...st });
   });
   chrome.storage.onChanged.addListener((changes, area) => {

@@ -2,6 +2,7 @@
 .tyc-b.lte-on {
   position: relative;
   overflow: visible;
+  margin-right: var(--lte-shrink, 0px); /* place pour les colonnes si l'écran est étroit */
 }
 
 .lte-side {
@@ -20,7 +21,8 @@
 
 .lte-badge,
 .lte-pct,
-.lte-score {
+.lte-score,
+.lte-pay {
   cursor: help;
 }
 
@@ -28,7 +30,8 @@
 .lte-badge, .lte-head > :nth-child(1) { width: 64px; }
 .lte-pct,   .lte-head > :nth-child(2) { width: 76px; }
 .lte-score, .lte-head > :nth-child(3) { width: 80px; }
-.lte-badge, .lte-pct, .lte-score { text-align: center; } /* centrés sous leur titre */
+.lte-pay,   .lte-head > :nth-child(4) { width: 84px; }
+.lte-badge, .lte-pct, .lte-score, .lte-pay { text-align: center; } /* centrés sous leur titre */
 
 /* Titres des colonnes, au-dessus de la première ligne */
 .lte-head {
@@ -83,4 +86,13 @@
 /* Animation d'ouverture d'onglet : le contour se dessine depuis le milieu en haut jusqu'à sa valeur */
 .lte-ring-intro .lte-ring-prog {
   transition: stroke-dasharray 0.9s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+/* Machines restantes avant la prochaine amélioration, après le nom et le nombre */
+.lte-next {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #858999;
+  cursor: help;
 }
