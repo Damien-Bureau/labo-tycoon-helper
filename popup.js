@@ -2,8 +2,9 @@
 //   indicators : afficher les indicateurs (onglet Labo)
 //   rings      : afficher les contours des boutons d'achat (Labo + Améliorer)
 //   stats      : afficher les stats supplémentaires (hors ligne max, café) dans le panneau de gauche
+//   eta        : afficher le décompte avant de pouvoir acheter une machine
 // content.js réagit immédiatement, sans recharger la page.
-const DEFAULTS = { indicators: true, rings: true, stats: true };
+const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true };
 const KEYS = Object.keys(DEFAULTS);
 
 const all = document.getElementById('all');
@@ -30,7 +31,7 @@ function save(next) {
 chrome.storage.local.get(null, (st) => {
   // Ancienne version : un seul interrupteur « enabled »
   if (typeof st.enabled === 'boolean' && st.indicators === undefined && st.rings === undefined) {
-    st.indicators = st.rings = st.stats = st.enabled;
+    st.indicators = st.rings = st.stats = st.eta = st.enabled;
   }
   for (const k of KEYS) if (typeof st[k] === 'boolean') cfg[k] = st[k];
   render();

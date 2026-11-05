@@ -78,7 +78,7 @@
   function update() {
     updateExtras();
     const list = document.getElementById('tycBuildings');
-    if (!cfg.indicators || !list || document.hidden || !list.offsetParent) { updateRings(); return; } // indicateurs masqués / Labo non affiché
+    if (!cfg.indicators || !list || document.hidden || !list.offsetParent) { updateRings(); updateEtas(); return; } // indicateurs masqués / Labo non affiché
 
     const rows = [];
     let base = 0; // production de base = somme des bits/s de chaque bâtiment (hors bonus temporaires)
@@ -194,6 +194,7 @@
     }
     fitColumns(list, rows[0]);
     updateRings();
+    updateEtas();
   }
 
   /* ---- Panneau de gauche : durée hors ligne max et café ----
@@ -457,6 +458,44 @@
     });
   }
 
+  /* ---- Décompte avant de pouvoir acheter (onglet Labo) ----
+   * À gauche du bouton des machines pas encore achetables : (prix − cagnotte) ÷ production actuelle,
+   * mis à jour à chaque tick. Réglage « eta » de la popup. */
+  function fmtClock(sec) {
+    const s = Math.ceil(sec);
+    if (s < 60) return `${s} s`;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    if (h >= 24) return fmtDuration(sec);
+    const mm = String(m).padStart(2, '0'), rr = String(r).padStart(2, '0');
+    return h ? `${h}:${mm}:${rr}` : `${m}:${rr}`;
+  }
+  function updateEtas() {
+    if (!cfg.eta || document.hidden) return;
+    const list = document.getElementById('tycBuildings');
+    if (!list || !list.offsetParent) return;
+    const bits = readBits();
+    const rate = parseNum(document.getElementById('tycRate')?.textContent);
+    for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
+      const btn = row.querySelector('.tyc-buy');
+      if (!btn) continue;
+      let el = btn.querySelector(':scope > .lte-eta');
+      const cost = parseNum(row.querySelector('.tyc-buyc')?.textContent);
+      const missing = cost - bits;
+      if (btn.classList.contains('ok') || !(missing > 0) || !(rate > 0)) { if (el) el.hidden = true; continue; }
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'lte-eta';
+        // même fond que la carte (thème clair ou sombre) : masque proprement une description longue
+        el.style.background = getComputedStyle(row).backgroundColor;
+        btn.appendChild(el);
+        btn.classList.add('lte-eta-on');
+      }
+      el.hidden = false;
+      const eta = missing / rate;
+      setText(el, `⏳ ${fmtClock(eta)}`, `Achetable dans ${fmtDuration(eta)} au rythme actuel (${fmt(rate)} bits/s)`);
+    }
+  }
+
   function setText(el, text, title) {
     if (el.textContent !== text) el.textContent = text;
     if (el.title !== title) el.title = title;
@@ -484,14 +523,14 @@
       scheduled = pendingFull = pendingRings = false;
       if (!running) return;
       observer.disconnect();
-      try { full ? update() : updateRings(); } finally { if (running) observe(); }
+      try { if (full) update(); else { updateRings(); updateEtas(); } } finally { if (running) observe(); }
     });
   });
   const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
   /* ------------------------- Réglages (popup) ------------------------- */
-  // chrome.storage.local : { indicators, rings, stats } (booléens, true par défaut).
-  const DEFAULTS = { indicators: true, rings: true, stats: true };
+  // chrome.storage.local : { indicators, rings, stats, eta } (booléens, true par défaut).
+  const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true };
   let cfg = { indicators: false, rings: false };
   let running = false, timer = null;
 
@@ -499,6 +538,10 @@
     document.querySelectorAll('.lte-side, .lte-head, .lte-next').forEach((el) => el.remove());
     document.getElementById('tycBuildings')?.style.removeProperty('--lte-shrink');
     document.querySelectorAll('.lte-on').forEach((el) => el.classList.remove('lte-on'));
+  };
+  const removeEtas = () => {
+    document.querySelectorAll('.lte-eta').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-eta-on').forEach((el) => el.classList.remove('lte-eta-on'));
   };
   const removeStats = () => {
     document.querySelectorAll('.lte-extra').forEach((el) => el.remove());
@@ -516,7 +559,8 @@
     if (!cfg.indicators) removeIndicators();
     if (!cfg.rings) removeRings();
     if (!cfg.stats) removeStats();
-    const active = cfg.indicators || cfg.rings || cfg.stats;
+    if (!cfg.eta) removeEtas();
+    const active = cfg.indicators || cfg.rings || cfg.stats || cfg.eta;
     if (active && !running) {
       running = true;
       observe();
@@ -532,8 +576,8 @@
   chrome.storage.local.get(null, (st) => {
     // Ancienne version : un seul interrupteur « enabled »
     if (typeof st.enabled === 'boolean' && st.indicators === undefined && st.rings === undefined) {
-      st.indicators = st.rings = st.stats = st.enabled;
-      chrome.storage.local.set({ indicators: st.enabled, rings: st.enabled, stats: st.enabled });
+      st.indicators = st.rings = st.stats = st.eta = st.enabled;
+      chrome.storage.local.set({ indicators: st.enabled, rings: st.enabled, stats: st.enabled, eta: st.enabled });
       chrome.storage.local.remove('enabled');
     }
     learnedTiers = st.tiers || {};
