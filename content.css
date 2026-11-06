@@ -21,8 +21,7 @@
 
 .lte-badge,
 .lte-pct,
-.lte-score,
-.lte-pay {
+.lte-score {
   cursor: help;
 }
 
@@ -30,8 +29,7 @@
 .lte-badge, .lte-head > :nth-child(1) { width: 64px; }
 .lte-pct,   .lte-head > :nth-child(2) { width: 76px; }
 .lte-score, .lte-head > :nth-child(3) { width: 80px; }
-.lte-pay,   .lte-head > :nth-child(4) { width: 84px; }
-.lte-badge, .lte-pct, .lte-score, .lte-pay { text-align: center; } /* centrés sous leur titre */
+.lte-badge, .lte-pct, .lte-score { text-align: center; } /* centrés sous leur titre */
 
 /* Titres des colonnes, au-dessus de la première ligne */
 .lte-head {
@@ -39,7 +37,7 @@
   left: calc(100% + 12px);
   bottom: calc(100% + 5px);
   display: flex;
-  align-items: flex-end;
+  align-items: center; /* titres d'1 ou 2 lignes centrés verticalement entre eux */
   gap: 10px;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 10.5px;

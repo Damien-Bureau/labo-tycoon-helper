@@ -103,44 +103,34 @@
       r.pct = isFinite(r.gain) && r.gain > 0 && base > 0 ? (r.gain / base) * 100 : NaN;
       r.score = isFinite(r.pct) && r.pct > 0 && isFinite(r.ratio) ? 1 / r.ratio / r.pct : NaN;
     }
-    //   pay   = rentabilisé dans (s) = attente pour réunir le prix + temps pour que l'achat se rembourse
-    //           (au rythme actuel, café et événements compris) — plus petit = mieux
     const bits = readBits();
-    const rate = parseNum(document.getElementById('tycRate')?.textContent); // production (café compris)
-    const income = incomeRate();                                             // + clics auto : vitesse de la cagnotte
-    const boost = base > 0 && rate > 0 ? rate / base : 1;
-    for (const r of rows) {
-      if (!(r.gain > 0 && r.cost > 0 && isFinite(bits))) { r.pay = NaN; continue; }
-      const missing = Math.max(0, r.cost - bits);
-      const wait = missing === 0 ? 0 : income > 0 ? missing / income : Infinity;
-      r.pay = wait + r.cost / (r.gain * boost);
-    }
+    const income = incomeRate(); // production (café compris) + clics auto : vitesse de la cagnotte
     const maxOf = (k) => Math.max(0, ...rows.map((r) => (isFinite(r[k]) ? r[k] : 0)));
     const minOf = (k) => Math.min(...rows.map((r) => (isFinite(r[k]) && r[k] > 0 ? r[k] : Infinity)));
     const best = maxOf('ratio'), bestPct = maxOf('pct');
-    const bestScore = minOf('score'), bestPay = minOf('pay');
+    const bestScore = minOf('score');
     const tiers = readTiers();
 
     // Titres des colonnes, au-dessus de la première ligne
-    if (rows[0] && rows[0].row.querySelector(':scope > .lte-head')?.children.length !== 4) {
+    if (rows[0] && rows[0].row.querySelector(':scope > .lte-head')?.children.length !== 3) {
       list.querySelectorAll('.lte-head').forEach((el) => el.remove());
       const head = document.createElement('span');
       head.className = 'lte-head';
-      head.innerHTML = '<span>Prix d’1 bit/s</span><span>Hausse de<br>la prod</span><span>Prix d’1 % de hausse</span><span>Rentabilisé<br>dans</span>';
+      head.innerHTML = '<span>Prix d’1 bit/s</span><span>Hausse de<br>la prod</span><span>Prix d’1 % de hausse</span>';
       rows[0].row.appendChild(head);
     }
 
     for (const r of rows) {
       let side = r.row.querySelector(':scope > .lte-side');
-      if (!side || side.children.length !== 4) {
+      if (!side || side.children.length !== 3) {
         side?.remove();
         side = document.createElement('span');
         side.className = 'lte-side';
-        side.innerHTML = '<span class="lte-badge"></span><span class="lte-pct"></span><span class="lte-score"></span><span class="lte-pay"></span>';
+        side.innerHTML = '<span class="lte-badge"></span><span class="lte-pct"></span><span class="lte-score"></span>';
         r.row.appendChild(side);
         r.row.classList.add('lte-on');
       }
-      const [badge, pctEl, scoreEl, payEl] = side.children;
+      const [badge, pctEl, scoreEl] = side.children;
 
       // 1) Ratio prix ÷ production (plus petit = meilleur)
       let text = '—', cls = 'lte-na', title = 'Impossible de lire le prix ou la production';
@@ -176,19 +166,6 @@
       }
       setText(scoreEl, sText, sTitle);
       setTier(scoreEl, sCls);
-
-      // 4) Rentabilisé dans : attente + remboursement (plus petit = meilleur)
-      let yText = '—', yCls = 'lte-na', yTitle = 'Prix, production ou cagnotte illisible';
-      if (isFinite(r.pay) && r.pay > 0 && isFinite(bestPay)) {
-        yCls = tier(Math.log10(r.pay / bestPay));
-        yText = `${fmtDuration(r.pay)}${yCls === 'lte-best' ? ' ★' : ''}`;
-        const wait = Math.max(0, r.pay - r.cost / (r.gain * boost));
-        yTitle =
-          `Rentabilisé dans ${fmtDuration(r.pay)} = attente ${fmtDuration(wait)} + remboursement ${fmtDuration(r.pay - wait)}\n` +
-          `(au rythme actuel de ${fmt(income)} bits/s, café, événements et clics auto compris)`;
-      }
-      setText(payEl, yText, yTitle);
-      setTier(payEl, yCls);
 
       // Machines restantes avant la prochaine amélioration (après le nom)
       updateNextTier(r, tiers, bits, income);
