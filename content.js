@@ -588,6 +588,28 @@
     if (running) update();
   }
 
+  /* ---- Raccourci : 2 appuis rapides sur Ctrl = tout activer / tout désactiver ----
+   * Ignoré si une autre touche est pressée entre les deux (Ctrl+C, Ctrl+clic…) ou si Ctrl est maintenu. */
+  const DOUBLE_CTRL_MS = 400;
+  let lastCtrlUp = -Infinity, ctrlClean = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Control') { if (!e.repeat) ctrlClean = true; return; }
+    ctrlClean = false; lastCtrlUp = -Infinity; // une autre touche : ce n'est pas un double Ctrl
+  }, true);
+  window.addEventListener('mousedown', () => { ctrlClean = false; lastCtrlUp = -Infinity; }, true);
+  window.addEventListener('keyup', (e) => {
+    if (e.key !== 'Control' || !ctrlClean) return;
+    ctrlClean = false;
+    const now = performance.now();
+    if (now - lastCtrlUp < DOUBLE_CTRL_MS) {
+      lastCtrlUp = -Infinity;
+      const allOn = Object.keys(DEFAULTS).every((k) => cfg[k]);
+      chrome.storage.local.set(Object.fromEntries(Object.keys(DEFAULTS).map((k) => [k, !allOn]))); // applyConfig via onChanged
+    } else {
+      lastCtrlUp = now;
+    }
+  }, true);
+
   chrome.storage.local.get(null, (st) => {
     // Ancienne version : un seul interrupteur « enabled »
     if (typeof st.enabled === 'boolean' && st.indicators === undefined && st.rings === undefined) {

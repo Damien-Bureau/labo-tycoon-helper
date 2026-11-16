@@ -67,3 +67,14 @@ input:checked + .switch::after { transform: translateX(16px); }
 input:indeterminate + .switch { background: #a3aae0; }
 input:indeterminate + .switch::after { transform: translateX(8px); }
 input:focus-visible + .switch { outline: 2px solid #4a58b8; outline-offset: 2px; }
+
+.tip { margin: 12px 2px 0; color: #858999; font-size: 11.5px; line-height: 1.4; }
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #d5d3cc;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fff;
+  font: 600 10.5px Inter, system-ui, sans-serif;
+  color: #1f2330;
+}
