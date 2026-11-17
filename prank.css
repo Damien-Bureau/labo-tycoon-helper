@@ -28,7 +28,7 @@
 .prk-banner {
   position: fixed;
   inset: 0;
-  z-index: 2147483641;
+  z-index: 2147483637; /* sous la puce (2147483646), qui reste au premier plan */
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -58,6 +58,18 @@
 @keyframes prk-boom {
   0%   { font-size: 24px; opacity: 1; }
   100% { font-size: 300px; opacity: 0; }
+}
+
+/* Petit texte après l'explosion */
+.prk-dead {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2147483645;
+  color: #858999;
+  font: 600 15px 'Space Grotesk', Inter, system-ui, sans-serif;
+  pointer-events: none;
 }
 
 /* Popup « café de Pô » */

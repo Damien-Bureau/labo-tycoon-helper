@@ -54,13 +54,14 @@
     balloonMode = true;
 
     const rect = chip.getBoundingClientRect();
+    document.body.appendChild(chip); // sortie de toute zone qui la masquerait → toujours au premier plan
     chip.style.position = 'fixed';
     chip.style.left = `${rect.left}px`;
     chip.style.top = `${rect.top}px`;
     chip.style.width = `${rect.width}px`;
     chip.style.height = `${rect.height}px`;
     chip.style.margin = '0';
-    chip.style.zIndex = '2147483640';
+    chip.style.zIndex = '2147483646';
     chip.classList.add('prk-balloon');
 
     showBanner('Double-clic sur la puce avant qu’elle explose !');
@@ -68,17 +69,17 @@
     const state = { defused: false, exploded: false, raf: 0, boom: 0 };
 
     let x = rect.left, y = rect.top;
-    let vx = (Math.random() * 2 - 1) * 8, vy = -9;
-    let rot = 0, vr = (Math.random() * 2 - 1) * 10, scale = 1;
+    let vx = (Math.random() * 2 - 1) * 7, vy = -8;
+    let rot = 0, vr = (Math.random() * 2 - 1) * 9, scale = 1;
     const t0 = performance.now();
 
     function frame(now) {
       if (state.defused || state.exploded) return;
       const t = now - t0;
       // dégonflage : poussées aléatoires façon « pfffft »
-      vx += (Math.random() * 2 - 1) * 2.6;
-      vy += (Math.random() * 2 - 1) * 2.6;
-      const sp = Math.hypot(vx, vy), max = 16;
+      vx += (Math.random() * 2 - 1) * 2.35;
+      vy += (Math.random() * 2 - 1) * 2.35;
+      const sp = Math.hypot(vx, vy), max = 14.5;
       if (sp > max) { vx = vx / sp * max; vy = vy / sp * max; }
       x += vx; y += vy;
       scale = Math.max(0.5, 1 - (t / 30000) * 0.45);
@@ -105,6 +106,8 @@
       removeBanner();
       chip.style.transition = 'transform .4s ease';
       chip.style.transform = 'rotate(0deg) scale(1)';
+      setTimeout(() => { chip.style.transition = ''; enableDrag(chip); }, 420);
+      shuffleButtons(); // les boutons d'achat se mélangent
     });
 
     // Sinon, explosion au bout de 30 s : toute l'interface disparaît (rechargement nécessaire)
@@ -129,8 +132,55 @@
     setTimeout(() => {
       const panel = document.querySelector('.tyc') || document.getElementById('tycPanel');
       if (panel) panel.style.visibility = 'hidden';
+      showDeadLabel();
     }, 450);
     setTimeout(() => boom.remove(), 1600);
+  }
+
+  // Petit texte au centre une fois le labo disparu
+  function showDeadLabel() {
+    if (document.querySelector('.prk-dead')) return;
+    const d = document.createElement('div');
+    d.className = 'prk-dead';
+    d.textContent = 'Ton labo a explosé';
+    document.body.appendChild(d);
+  }
+
+  // Glisser-déposer la puce désamorcée pour la remettre où on veut
+  function enableDrag(chip) {
+    chip.style.cursor = 'grab';
+    chip.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      chip.style.cursor = 'grabbing';
+      const r = chip.getBoundingClientRect();
+      const ox = e.clientX - r.left, oy = e.clientY - r.top;
+      const move = (ev) => {
+        chip.style.left = `${ev.clientX - ox}px`;
+        chip.style.top = `${ev.clientY - oy}px`;
+      };
+      const up = () => {
+        chip.style.cursor = 'grab';
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+  }
+
+  // Mélange l'ordre d'affichage des machines (via l'ordre flex : résiste aux maj de prix du jeu)
+  function shuffleButtons() {
+    const list = document.getElementById('tycBuildings');
+    if (!list) return;
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    const rows = [...list.querySelectorAll('.tyc-b')];
+    const order = rows.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    rows.forEach((r, i) => { r.style.order = String(order[i]); });
   }
 
   /* ============================================================
@@ -168,7 +218,7 @@
     requestAnimationFrame(() => o.classList.add('prk-po-in'));
     const close = () => { o.classList.remove('prk-po-in'); setTimeout(() => o.remove(), 300); };
     o.addEventListener('click', close);
-    setTimeout(close, 2500);
+    setTimeout(close, 5000);
   }
 
   /* ---------------- bannière centrale ---------------- */
