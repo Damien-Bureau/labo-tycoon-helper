@@ -12,7 +12,8 @@ const allHint = document.getElementById('allHint');
 const toggles = Object.fromEntries(KEYS.map((k) => [k, document.getElementById(k)]));
 let cfg = { ...DEFAULTS };
 
-document.getElementById('version').textContent = `v${chrome.runtime.getManifest().version}`;
+const manifest = chrome.runtime.getManifest();
+document.getElementById('version').textContent = `v${manifest.version_name || manifest.version}`;
 
 function render() {
   for (const k of KEYS) toggles[k].checked = cfg[k];
