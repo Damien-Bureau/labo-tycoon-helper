@@ -167,7 +167,9 @@
       // Pas d'info-bulle native ici : une bulle avec graphe s'affiche au survol (voir « Bulle du prix d'1 % »)
       setText(scoreEl, sText, '');
       setTier(scoreEl, sCls);
-      scoreEl._lte = { name: r.name, unit: r.unit, each: r.each, qty: r.qty, base, bits, line: sTitle };
+      const lotLabel = r.row.querySelector('.tyc-buyl')?.textContent || '';
+      const lot = /max/i.test(lotLabel) ? 'max' : r.qty >= 10 ? 'x10' : 'x1';
+      scoreEl._lte = { name: r.name, unit: r.unit, each: r.each, qty: r.qty, lot, base, bits, line: sTitle };
       if (tip.target === scoreEl) renderTip();
 
       // Machines restantes avant la prochaine amélioration (après le nom)
@@ -278,9 +280,15 @@
     // Axe : au moins jusqu'aux machines achetables, et assez loin pour voir l'optimum et la remontée
     const N = Math.min(300, Math.max(15, Math.ceil(kMax * 1.25), best * 2));
     const pts = all.slice(0, N);
-    const shown = Math.min(N, Math.max(1, d.qty));
+    // Les 3 lots du jeu, toujours affichés ; celui sélectionné (×1 / ×10 / Max) est mis en avant
+    const lots = [
+      { key: 'x1', label: '×1', k: 1 },
+      { key: 'x10', label: '×10', k: 10 },
+      { key: 'max', label: 'Max', k: kMax },
+    ];
+    const current = d.lot; // 'x1' | 'x10' | 'max'
     // Géométrie
-    const W = 280, H = 156, L = 44, R = 10, T = 10, B = 32;
+    const W = 280, H = 166, L = 44, R = 12, T = 22, B = 32;
     const lo = Math.log10(Math.min(...pts)), hi = Math.log10(Math.max(...pts));
     const span = hi - lo || 1;
     const X = (k) => L + ((k - 1) / Math.max(1, N - 1)) * (W - L - R);
@@ -289,25 +297,33 @@
     const cut = Math.max(1, Math.min(kMax, N));
     const ticksY = [lo, lo + span / 2, hi].map((l) => `<text x="${L - 6}" y="${Y(10 ** l) + 3}" text-anchor="end">${fmt(10 ** l)}</text>`).join('');
     const ticksX = [1, Math.round((N + 1) / 2), N].map((k) => `<text x="${X(k)}" y="${H - B + 12}" text-anchor="middle">${k}</text>`).join('');
-    const dot = (k, cls) => `<circle class="${cls}" cx="${X(k).toFixed(1)}" cy="${Y(pts[k - 1]).toFixed(1)}" r="4"/>`;
+    const marker = (lot) => {
+      if (lot.k < 1 || lot.k > N) return '';
+      const x = X(lot.k).toFixed(1), y = Y(pts[lot.k - 1]).toFixed(1), on = lot.key === current;
+      return `<g class="lte-tip-lot lte-tip-${lot.key}${on ? ' lte-tip-on' : ''}">` +
+        `<circle cx="${x}" cy="${y}" r="${on ? 5 : 3.5}"/>` +
+        `<text x="${x}" y="${(+y - 8).toFixed(1)}" text-anchor="middle">${lot.label}</text></g>`;
+    };
+    const legend = (lot) => {
+      const v = lot.k >= 1 ? `${lot.k > 1 && lot.key === 'max' ? `${lot.k} → ` : ''}${fmt(all[lot.k - 1])}` : 'aucune achetable';
+      return `<span class="${lot.key === current ? 'lte-tip-on' : ''}"><i class="lte-tip-${lot.key}"></i>${lot.label} : ${v}</span>`;
+    };
     tip.el.innerHTML =
       `<div class="lte-tip-title">${d.name} — prix d’1 % de hausse selon le nombre acheté</div>` +
       `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">` +
       (kMax >= 1 ? `<rect class="lte-tip-zone" x="${L}" y="${T}" width="${(X(cut) - L).toFixed(1)}" height="${H - T - B}"/>` : '') +
+      `<line class="lte-tip-opt" x1="${X(best).toFixed(1)}" y1="${T}" x2="${X(best).toFixed(1)}" y2="${H - B}"/>` +
       `<line class="lte-tip-axis" x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}"/>` +
       `<line class="lte-tip-axis" x1="${L}" y1="${T}" x2="${L}" y2="${H - B}"/>` +
       (kMax >= 1 ? `<path class="lte-tip-line" d="${path(1, cut)}"/>` : '') +
       (cut < N ? `<path class="lte-tip-line lte-tip-out" d="${path(kMax >= 1 ? cut : 1, N)}"/>` : '') +
-      dot(best, 'lte-tip-best') + dot(shown, 'lte-tip-shown') +
+      lots.filter((l) => l.key !== current).map(marker).join('') + marker(lots.find((l) => l.key === current) || lots[0]) +
       `<g class="lte-tip-ticks">${ticksY}${ticksX}</g>` +
       `<text class="lte-tip-axislabel" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">machines achetées d’un coup</text>` +
       `</svg>` +
-      `<div class="lte-tip-legend">` +
-      `<span><i class="lte-tip-k-shown"></i>Lot affiché : ${shown} → ${fmt(pts[shown - 1])}</span>` +
-      `<span><i class="lte-tip-k-best"></i>Optimum : ${best} → ${fmt(pts[best - 1])}</span>` +
-      `<span><i class="lte-tip-k-zone"></i>Achetables maintenant : ${kMax}</span>` +
-      `</div>` +
-      `<div class="lte-tip-note">Plus c’est bas, mieux c’est · échelle logarithmique</div>`;
+      `<div class="lte-tip-legend">${lots.map(legend).join('')}` +
+      `<span class="lte-tip-dim"><i class="lte-tip-k-opt"></i>Optimum : ${best} → ${fmt(all[best - 1])}</span></div>` +
+      `<div class="lte-tip-note">Zone verte : achetables maintenant · plus c’est bas, mieux c’est · échelle log</div>`;
     placeTip();
   }
   function placeTip() {
