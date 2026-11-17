@@ -1,0 +1,94 @@
+/* prank.css — gags purement visuels (branche dev) */
+
+/* Broche qui tombe */
+.prk-pin {
+  position: fixed;
+  z-index: 2147483639;
+  background: linear-gradient(#e2bf6a, #c9a24a 60%, #a9842f);
+  border-radius: 2px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.prk-pin-fall { animation: prk-fall 1.6s cubic-bezier(.35, .7, .6, 1) forwards; }
+@keyframes prk-fall {
+  0%   { transform: translate(0, 0) rotate(0); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(var(--prk-drift, 0), 75vh) rotate(var(--prk-spin, 540deg)); opacity: 0; }
+}
+/* La vraie broche du jeu disparaît */
+.tyc-pins rect.prk-gone { fill: transparent !important; }
+
+/* La puce en vol */
+.prk-balloon {
+  cursor: pointer !important;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .3)) !important;
+}
+
+/* Bannière centrale « double-clic avant qu'elle explose » */
+.prk-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483641;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  pointer-events: none;
+}
+.prk-banner-box {
+  margin-top: 14vh;
+  padding: 18px 30px;
+  border-radius: 16px;
+  background: #d0102a;
+  color: #fff;
+  font: 800 clamp(20px, 3.2vw, 34px) / 1.2 'Space Grotesk', Inter, system-ui, sans-serif;
+  text-align: center;
+  box-shadow: 0 12px 44px rgba(0, 0, 0, .4);
+  animation: prk-pulse .7s ease-in-out infinite alternate;
+}
+@keyframes prk-pulse { from { transform: scale(1); } to { transform: scale(1.06); } }
+
+/* Explosion */
+.prk-boom {
+  position: fixed;
+  z-index: 2147483646;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: prk-boom 1.4s ease-out forwards;
+}
+@keyframes prk-boom {
+  0%   { font-size: 24px; opacity: 1; }
+  100% { font-size: 300px; opacity: 0; }
+}
+
+/* Popup « café de Pô » */
+.prk-po {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: rgba(0, 0, 0, .55);
+  opacity: 0;
+  transition: opacity .3s ease;
+  cursor: pointer;
+}
+.prk-po.prk-po-in { opacity: 1; }
+.prk-po img {
+  width: min(44vw, 320px);
+  height: auto;
+  image-rendering: auto;
+  animation: prk-bob 1s ease-in-out infinite alternate;
+}
+@keyframes prk-bob {
+  from { transform: translateY(0) rotate(-5deg); }
+  to   { transform: translateY(-18px) rotate(5deg); }
+}
+.prk-po-txt {
+  color: #fff;
+  font: 900 clamp(28px, 7vw, 58px) / 1 'Space Grotesk', Inter, system-ui, sans-serif;
+  text-align: center;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, .55);
+}
