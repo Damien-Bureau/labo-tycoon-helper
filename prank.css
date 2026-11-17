@@ -47,30 +47,69 @@
 }
 @keyframes prk-pulse { from { transform: scale(1); } to { transform: scale(1.06); } }
 
-/* Explosion */
-.prk-boom {
+/* Explosion plein écran, lente */
+.prk-explosion {
   position: fixed;
+  inset: 0;
   z-index: 2147483646;
-  transform: translate(-50%, -50%);
   pointer-events: none;
-  animation: prk-boom 1.4s ease-out forwards;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
-@keyframes prk-boom {
-  0%   { font-size: 24px; opacity: 1; }
-  100% { font-size: 300px; opacity: 0; }
+.prk-explosion-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center,
+    #fff 0%, #ffe28a 18%, #ff9d3c 36%, #e0102a 55%, rgba(224, 16, 42, 0) 72%);
+  transform: scale(0.05);
+  opacity: 0;
+  animation: prk-flash 2.4s ease-out forwards;
+}
+@keyframes prk-flash {
+  0%   { transform: scale(0.05); opacity: 0; }
+  15%  { opacity: 1; }
+  55%  { transform: scale(1.7); opacity: 1; }
+  100% { transform: scale(2.3); opacity: 0; }
+}
+.prk-explosion-emoji {
+  opacity: 0;
+  animation: prk-exp-emoji 2.4s ease-out forwards;
+}
+@keyframes prk-exp-emoji {
+  0%   { font-size: 30px; opacity: 0; }
+  20%  { opacity: 1; }
+  70%  { font-size: min(90vmin, 900px); opacity: .95; }
+  100% { font-size: min(100vmin, 1000px); opacity: 0; }
 }
 
-/* Petit texte après l'explosion */
-.prk-dead {
+/* Séquence finale */
+.prk-end {
   position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
   z-index: 2147483645;
-  color: #858999;
-  font: 600 15px 'Space Grotesk', Inter, system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
   pointer-events: none;
 }
+.prk-end-title, .prk-end-cheh, .prk-end-po { opacity: 0; transition: opacity 1.2s ease; }
+.prk-in { opacity: 1; }
+.prk-end-title {
+  color: #2b2f3a;
+  font: 800 clamp(22px, 3vw, 34px) / 1.1 'Space Grotesk', Inter, system-ui, sans-serif;
+}
+.prk-end-cheh {
+  color: #d0102a;
+  font: 900 clamp(44px, 8vw, 80px) / 1 'Space Grotesk', Inter, system-ui, sans-serif;
+  letter-spacing: 2px;
+}
+.prk-end-po { width: min(30vw, 220px); height: auto; }
+.prk-end-po.prk-in { animation: prk-spin 6s linear infinite; }
+@keyframes prk-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 
 /* Popup « café de Pô » */
 .prk-po {

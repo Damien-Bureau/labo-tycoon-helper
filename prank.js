@@ -54,7 +54,15 @@
     balloonMode = true;
 
     const rect = chip.getBoundingClientRect();
+    // Figer les couleurs du jeu (boîtier/cœur) : elles viennent de variables CSS d'un parent
+    // qu'on quitte en déplaçant la puce dans <body>, sinon elle devient un carré noir.
+    const die = chip.querySelector('.tyc-die');
+    const core = chip.querySelector('.tyc-core');
+    const dieFill = die && getComputedStyle(die).fill;
+    const coreFill = core && getComputedStyle(core).fill;
     document.body.appendChild(chip); // sortie de toute zone qui la masquerait → toujours au premier plan
+    if (die) die.style.fill = dieFill;
+    if (core) core.style.fill = coreFill;
     chip.style.position = 'fixed';
     chip.style.left = `${rect.left}px`;
     chip.style.top = `${rect.top}px`;
@@ -121,29 +129,37 @@
 
   function explode(chip) {
     removeBanner();
-    const r = chip.getBoundingClientRect();
-    const boom = document.createElement('div');
-    boom.className = 'prk-boom';
-    boom.textContent = '💥';
-    boom.style.left = `${r.left + r.width / 2}px`;
-    boom.style.top = `${r.top + r.height / 2}px`;
-    document.body.appendChild(boom);
     chip.style.display = 'none';
+    // Explosion plein écran, lente (~2,4 s)
+    const ex = document.createElement('div');
+    ex.className = 'prk-explosion';
+    ex.innerHTML = '<div class="prk-explosion-flash"></div><div class="prk-explosion-emoji">💥</div>';
+    document.body.appendChild(ex);
+    // Le labo disparaît quand le flash couvre l'écran
     setTimeout(() => {
       const panel = document.querySelector('.tyc') || document.getElementById('tycPanel');
       if (panel) panel.style.visibility = 'hidden';
-      showDeadLabel();
-    }, 450);
-    setTimeout(() => boom.remove(), 1600);
+    }, 700);
+    setTimeout(() => ex.remove(), 2600);
+    playEndSequence();
   }
 
-  // Petit texte au centre une fois le labo disparu
-  function showDeadLabel() {
-    if (document.querySelector('.prk-dead')) return;
-    const d = document.createElement('div');
-    d.className = 'prk-dead';
-    d.textContent = 'Ton labo a explosé';
-    document.body.appendChild(d);
+  // Séquence finale, apparitions espacées : titre → « cheh » → tête de Pô qui tourne
+  function playEndSequence() {
+    if (document.querySelector('.prk-end')) return;
+    const end = document.createElement('div');
+    end.className = 'prk-end';
+    end.innerHTML =
+      '<div class="prk-end-title">Ton labo a explosé</div>' +
+      '<div class="prk-end-cheh">cheh</div>' +
+      `<img class="prk-end-po" src="${PO_IMG}" alt="">`;
+    document.body.appendChild(end);
+    const title = end.querySelector('.prk-end-title');
+    const cheh = end.querySelector('.prk-end-cheh');
+    const po = end.querySelector('.prk-end-po');
+    setTimeout(() => title.classList.add('prk-in'), 4000);
+    setTimeout(() => cheh.classList.add('prk-in'), 6500);
+    setTimeout(() => po.classList.add('prk-in'), 9000);
   }
 
   // Glisser-déposer la puce désamorcée pour la remettre où on veut
@@ -217,8 +233,7 @@
     document.body.appendChild(o);
     requestAnimationFrame(() => o.classList.add('prk-po-in'));
     const close = () => { o.classList.remove('prk-po-in'); setTimeout(() => o.remove(), 300); };
-    o.addEventListener('click', close);
-    setTimeout(close, 5000);
+    setTimeout(close, 5000); // reste 5 s, ne se ferme pas au clic
   }
 
   /* ---------------- bannière centrale ---------------- */
