@@ -164,8 +164,11 @@
           `Prix d'un bit/s ÷ hausse % = ${fmt(1 / r.ratio)} ÷ ${fmtPct(r.pct)} = ${fmt(r.score)}\n` +
           `(plus c'est petit, mieux c'est)`;
       }
-      setText(scoreEl, sText, sTitle);
+      // Pas d'info-bulle native ici : une bulle avec graphe s'affiche au survol (voir « Bulle du prix d'1 % »)
+      setText(scoreEl, sText, '');
       setTier(scoreEl, sCls);
+      scoreEl._lte = { name: r.name, unit: r.unit, each: r.each, qty: r.qty, base, bits, line: sTitle };
+      if (tip.target === scoreEl) renderTip();
 
       // Machines restantes avant la prochaine amélioration (après le nom)
       updateNextTier(r, tiers, bits, income);
@@ -250,6 +253,88 @@
       }
     }
   }
+
+  /* ---- Bulle du prix d'1 % : graphe selon le nombre de machines achetées (feature/graphe-prix-1pct) ----
+   * Pour un lot de k machines : prix_k = p·(G^k − 1)/(G − 1), gain_k = k·e, hausse_k = gain_k/base·100,
+   * prix d'1 % (indicateur 3) = (prix_k/gain_k) / hausse_k. Tracé pour k = 1…N (N ≥ achetables en « Max »),
+   * en échelle log, avec la zone achetable, le lot affiché (×1/×10/Max) et l'optimum. */
+  const tip = { el: null, target: null };
+  function tipValue(d, k) {
+    const cost = (d.unit * (GROWTH ** k - 1)) / (GROWTH - 1), gain = k * d.each;
+    return (cost / gain) / ((gain / d.base) * 100);
+  }
+  function renderTip() {
+    const d = tip.target?._lte;
+    if (!tip.el || !d) return;
+    if (!(d.unit > 0 && d.each > 0 && d.base > 0)) { tip.el.textContent = d.line || 'Données indisponibles'; return; }
+    // Machines achetables avec la cagnotte (comme « Max »)
+    const kMax = isFinite(d.bits) && d.bits > 0 ? Math.max(0, Math.floor(Math.log((d.bits * (GROWTH - 1)) / d.unit + 1) / Math.log(GROWTH))) : 0;
+    const all = [];
+    let best = 1;
+    for (let k = 1; k <= 300; k++) {
+      all.push(tipValue(d, k));
+      if (all[k - 1] < all[best - 1]) best = k;
+    }
+    // Axe : au moins jusqu'aux machines achetables, et assez loin pour voir l'optimum et la remontée
+    const N = Math.min(300, Math.max(15, Math.ceil(kMax * 1.25), best * 2));
+    const pts = all.slice(0, N);
+    const shown = Math.min(N, Math.max(1, d.qty));
+    // Géométrie
+    const W = 280, H = 156, L = 44, R = 10, T = 10, B = 32;
+    const lo = Math.log10(Math.min(...pts)), hi = Math.log10(Math.max(...pts));
+    const span = hi - lo || 1;
+    const X = (k) => L + ((k - 1) / Math.max(1, N - 1)) * (W - L - R);
+    const Y = (v) => T + (1 - (Math.log10(v) - lo) / span) * (H - T - B);
+    const path = (from, to) => pts.slice(from - 1, to).map((v, i) => `${i ? 'L' : 'M'}${X(from + i).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+    const cut = Math.max(1, Math.min(kMax, N));
+    const ticksY = [lo, lo + span / 2, hi].map((l) => `<text x="${L - 6}" y="${Y(10 ** l) + 3}" text-anchor="end">${fmt(10 ** l)}</text>`).join('');
+    const ticksX = [1, Math.round((N + 1) / 2), N].map((k) => `<text x="${X(k)}" y="${H - B + 12}" text-anchor="middle">${k}</text>`).join('');
+    const dot = (k, cls) => `<circle class="${cls}" cx="${X(k).toFixed(1)}" cy="${Y(pts[k - 1]).toFixed(1)}" r="4"/>`;
+    tip.el.innerHTML =
+      `<div class="lte-tip-title">${d.name} — prix d’1 % de hausse selon le nombre acheté</div>` +
+      `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">` +
+      (kMax >= 1 ? `<rect class="lte-tip-zone" x="${L}" y="${T}" width="${(X(cut) - L).toFixed(1)}" height="${H - T - B}"/>` : '') +
+      `<line class="lte-tip-axis" x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}"/>` +
+      `<line class="lte-tip-axis" x1="${L}" y1="${T}" x2="${L}" y2="${H - B}"/>` +
+      (kMax >= 1 ? `<path class="lte-tip-line" d="${path(1, cut)}"/>` : '') +
+      (cut < N ? `<path class="lte-tip-line lte-tip-out" d="${path(kMax >= 1 ? cut : 1, N)}"/>` : '') +
+      dot(best, 'lte-tip-best') + dot(shown, 'lte-tip-shown') +
+      `<g class="lte-tip-ticks">${ticksY}${ticksX}</g>` +
+      `<text class="lte-tip-axislabel" x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle">machines achetées d’un coup</text>` +
+      `</svg>` +
+      `<div class="lte-tip-legend">` +
+      `<span><i class="lte-tip-k-shown"></i>Lot affiché : ${shown} → ${fmt(pts[shown - 1])}</span>` +
+      `<span><i class="lte-tip-k-best"></i>Optimum : ${best} → ${fmt(pts[best - 1])}</span>` +
+      `<span><i class="lte-tip-k-zone"></i>Achetables maintenant : ${kMax}</span>` +
+      `</div>` +
+      `<div class="lte-tip-note">Plus c’est bas, mieux c’est · échelle logarithmique</div>`;
+    placeTip();
+  }
+  function placeTip() {
+    if (!tip.el || !tip.target) return;
+    const r = tip.target.getBoundingClientRect(), b = tip.el.getBoundingClientRect();
+    let x = r.left + r.width / 2 - b.width / 2, y = r.bottom + 8;
+    if (y + b.height > innerHeight - 8) y = r.top - b.height - 8;      // pas de place dessous : au-dessus
+    x = Math.max(8, Math.min(x, innerWidth - b.width - 8));
+    tip.el.style.left = `${Math.round(x)}px`;
+    tip.el.style.top = `${Math.round(Math.max(8, y))}px`;
+  }
+  function hideTip() {
+    tip.target = null;
+    tip.el?.remove();
+    tip.el = null;
+  }
+  document.addEventListener('mouseover', (e) => {
+    const t = e.target.closest?.('.lte-score');
+    if (!t || t === tip.target) return;
+    tip.target = t;
+    if (!tip.el) { tip.el = document.createElement('div'); tip.el.className = 'lte-tip'; document.body.appendChild(tip.el); }
+    renderTip();
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (tip.target && !tip.target.contains(e.relatedTarget)) hideTip();
+  });
+  addEventListener('scroll', () => tip.target && placeTip(), true);
 
   /** Si les colonnes dépassent de l'écran, rétrécit les cartes du Labo juste assez pour les faire tenir. */
   function fitColumns(list, first) {
@@ -550,6 +635,7 @@
   let running = false, timer = null;
 
   const removeIndicators = () => {
+    hideTip();
     document.querySelectorAll('.lte-side, .lte-head, .lte-next').forEach((el) => el.remove());
     document.getElementById('tycBuildings')?.style.removeProperty('--lte-shrink');
     document.querySelectorAll('.lte-on').forEach((el) => el.classList.remove('lte-on'));
