@@ -122,3 +122,11 @@
   cursor: help;
   white-space: nowrap;
 }
+
+/* Boutons d'achat rapides (×11, → palier) dans la barre de quantité du jeu.
+   Ils héritent du style de .tyc-buyn button ; on ne personnalise que l'état actif. */
+.lte-buymode.on {
+  background: #4a58b8 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}

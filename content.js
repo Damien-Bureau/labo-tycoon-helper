@@ -77,6 +77,7 @@
 
   function update() {
     updateExtras();
+    updateBuy();
     const list = document.getElementById('tycBuildings');
     if (!cfg.indicators || !list || document.hidden || !list.offsetParent) { updateRings(); updateEtas(); return; } // indicateurs masqués / Labo non affiché
 
@@ -538,14 +539,100 @@
       scheduled = pendingFull = pendingRings = false;
       if (!running) return;
       observer.disconnect();
-      try { if (full) update(); else { updateRings(); updateEtas(); } } finally { if (running) observe(); }
+      try { if (full) update(); else { updateRings(); updateEtas(); updateBuy(); } } finally { if (running) observe(); }
     });
   });
   const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
+  /* ---- Achats rapides : boutons ×11 et « → palier » dans la barre de quantité ----
+   * ×11 = le meilleur rapport (voir « Prix d'1 % de hausse »). « → palier » = jusqu'au
+   * prochain palier d'amélioration de la machine cliquée. DOM uniquement : on force le
+   * mode ×1 du jeu et on clique son bouton d'achat le bon nombre de fois. Réglage « buy ». */
+  let buyMode = null;  // null | 'p11' | 'tier'
+  let buying = false;  // garde : ne pas intercepter nos propres clics programmés
+
+  function tierRemaining(name, count) {
+    const learned = (learnedTiers[name] || []).filter((n) => n > count);
+    const guessed = BASE_TIERS.filter((n) => n > count);
+    const target = Math.min(...learned, ...guessed);
+    return isFinite(target) ? target - count : 0;
+  }
+
+  function injectBuyButtons() {
+    const bar = document.getElementById('tycBuyN');
+    if (!bar || bar.querySelector('.lte-buymode')) return;
+    for (const [mode, label, title] of [
+      ['p11', '×11', 'Acheter 11 machines d’un coup (le meilleur rapport, voir « Prix d’1 % de hausse »)'],
+      ['tier', '→ palier', 'Acheter la machine cliquée jusqu’à son prochain palier d’amélioration'],
+    ]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lte-buymode';
+      b.dataset.lteBuy = mode;
+      b.textContent = label;
+      b.title = title;
+      bar.appendChild(b);
+    }
+  }
+
+  function updateBuy() {
+    if (!cfg.buy) return;
+    injectBuyButtons();
+    for (const b of document.querySelectorAll('.lte-buymode')) {
+      b.classList.toggle('on', b.dataset.lteBuy === buyMode);
+    }
+  }
+
+  // Achète n fois la machine via son vrai bouton, en forçant le mode ×1 du jeu puis en le restaurant.
+  function customBuy(row, mode) {
+    if (!row || buying) return;
+    const id = row.dataset.b;
+    const count = Number(row.querySelector('.tyc-cnt')?.textContent) || 0;
+    const name = (row.querySelector('.tyc-bt b')?.firstChild?.textContent || '').trim();
+    const n = mode === 'p11' ? 11 : tierRemaining(name, count);
+    if (!(n > 0)) return;
+    buying = true;
+    const prev = [...document.querySelectorAll('[data-tyc-n]')].find((b) => b.classList.contains('on'))?.dataset.tycN;
+    const setMode = (v) => document.querySelector(`[data-tyc-n="${v}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (prev !== '1') setMode('1');
+    for (let i = 0; i < n; i++) {
+      const b = document.querySelector(`#tycBuildings .tyc-b[data-b="${id}"] .tyc-buy`);
+      if (!b) break;
+      b.dispatchEvent(new MouseEvent('click', { bubbles: true })); // non abouti côté serveur si plus assez de bits
+    }
+    if (prev && prev !== '1') setMode(prev);
+    buying = false;
+  }
+
+  // En mode d'achat rapide, un clic sur une machine lance customBuy au lieu de l'achat normal.
+  document.addEventListener('click', (e) => {
+    if (buying || !buyMode) return;
+    const btn = e.target.closest && e.target.closest('.tyc-buy');
+    if (!btn || !btn.closest('#tycBuildings')) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    customBuy(btn.closest('.tyc-b[data-b]'), buyMode);
+  }, true);
+
+  // Clic sur nos boutons de mode ; choisir une quantité du jeu (×1/×10/Max) désactive notre mode.
+  document.addEventListener('click', (e) => {
+    const mine = e.target.closest && e.target.closest('.lte-buymode');
+    if (mine) {
+      e.preventDefault();
+      e.stopPropagation();
+      buyMode = buyMode === mine.dataset.lteBuy ? null : mine.dataset.lteBuy;
+      updateBuy();
+      return;
+    }
+    if (!buying && e.target.closest && e.target.closest('[data-tyc-n]') && buyMode) {
+      buyMode = null;
+      updateBuy();
+    }
+  }, true);
+
   /* ------------------------- Réglages (popup) ------------------------- */
-  // chrome.storage.local : { indicators, rings, stats, eta } (booléens, true par défaut).
-  const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true };
+  // chrome.storage.local : { indicators, rings, stats, eta, buy } (booléens, true par défaut).
+  const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true, buy: true };
   let cfg = { indicators: false, rings: false };
   let running = false, timer = null;
 
@@ -567,6 +654,10 @@
     document.querySelectorAll('.lte-ring').forEach((el) => el.remove());
     document.querySelectorAll('.lte-ring-on').forEach((el) => el.classList.remove('lte-ring-on'));
   };
+  const removeBuy = () => {
+    buyMode = null;
+    document.querySelectorAll('.lte-buymode').forEach((el) => el.remove());
+  };
 
   /** Applique les réglages : retire ce qui est désactivé, démarre / arrête la surveillance de la page. */
   function applyConfig(next) {
@@ -575,7 +666,8 @@
     if (!cfg.rings) removeRings();
     if (!cfg.stats) removeStats();
     if (!cfg.eta) removeEtas();
-    const active = cfg.indicators || cfg.rings || cfg.stats || cfg.eta;
+    if (!cfg.buy) removeBuy();
+    const active = cfg.indicators || cfg.rings || cfg.stats || cfg.eta || cfg.buy;
     if (active && !running) {
       running = true;
       observe();
@@ -613,8 +705,8 @@
   chrome.storage.local.get(null, (st) => {
     // Ancienne version : un seul interrupteur « enabled »
     if (typeof st.enabled === 'boolean' && st.indicators === undefined && st.rings === undefined) {
-      st.indicators = st.rings = st.stats = st.eta = st.enabled;
-      chrome.storage.local.set({ indicators: st.enabled, rings: st.enabled, stats: st.enabled, eta: st.enabled });
+      st.indicators = st.rings = st.stats = st.eta = st.buy = st.enabled;
+      chrome.storage.local.set({ indicators: st.enabled, rings: st.enabled, stats: st.enabled, eta: st.enabled, buy: st.enabled });
       chrome.storage.local.remove('enabled');
     }
     learnedTiers = st.tiers || {};
