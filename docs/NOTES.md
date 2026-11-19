@@ -9,13 +9,20 @@ variables de la page).
 
 ## Fichiers
 
-- `manifest.json` — MV3. `content_scripts` = `content.js` + `content.css` sur l'URL
-  du jeu. Permission `storage`. Icône microscope 🔬 (`icons/`). `version` doit rester
+- `manifest.json` — MV3. Deux `content_scripts` : `game-bridge.js` (monde **MAIN**,
+  `document_start`) puis `content.js` + `content.css` (monde isolé) sur l'URL du jeu.
+  Permission `storage`. Icône microscope 🔬 (`icons/`). `version` doit rester
   **numérique** (Chrome refuse « 1.x-beta ») ; les libellés vont dans `version_name`
   (utilisé sur les branches `dev` / `feature/*`, pas sur `main`).
+- `game-bridge.js` — petit pont dans le **monde principal** de la page. Enveloppe
+  `WebSocket` (Proxy sur le constructeur) pour lire les trames entrantes du jeu,
+  extraire l'état `view` et transmettre quelques champs (`stats`, `bits`, `rate`…) au
+  content script via `postMessage`. **Lecture seule**, n'émet rien. Nécessaire car
+  l'état `view` est enfermé dans une closure, inaccessible au content script isolé.
 - `content.js` — toute la logique (IIFE). Sections : parsing/format, `update()` +
-  sous-updaters (`updateRings`, `updateEtas`, `updateExtras`, `updateBuy`), achats
-  rapides, réglages/popup, raccourci double-Ctrl.
+  sous-updaters (`updateRings`, `updateEtas`, `updateExtras`, `updateBuy`,
+  `updateSablier`, `updateMissions`), achat rapide, réglages/popup, raccourci
+  double-Ctrl, réception des données du pont (`message`).
 - `content.css` — styles, préfixe `.lte-`.
 - `popup.html` / `popup.css` / `popup.js` — la popup de réglages.
 
@@ -42,6 +49,18 @@ variables de la page).
   `.tyc-b[data-b]` (→ `.tyc-cnt`, `.tyc-each`, `.tyc-bt b`, `.tyc-buy` →
   `.tyc-buyc`/`.tyc-buyl`), `#tycBuyN [data-tyc-n]`, `#tycCoffee`,
   `#tycUpgrades .tyc-u[data-cost]`, `#tycChip` + `.tyc-pins`.
+  Onglets : `[data-tyc-tab]` (`labo`, `upg`, `quest`, `dip`…).
+- **Améliorations (onglet Améliorer, `[data-tyc-tab="upg"]`)** : cartes
+  `button.tyc-u`. Classes : `ready` = débloquée (section « Disponibles »), `ok` =
+  payable tout de suite, `locked` = bloquée par un **nombre de machines** (section
+  « Bientôt », pas de temps). `data-cost` = coût **exact** en bits. Une carte
+  « Disponibles » peut n'avoir **aucun** `data-cost` (ex. « Subvention ») → ignorée.
+- **Compteur de missions caché** : le nombre de missions réussies **n'est nulle part
+  dans le DOM** (ni l'onglet Missions, ni les cartes de succès). Il vit dans l'état
+  `view` envoyé par **WebSocket** (socket.io) : `view.stats.missions`. Trame typique
+  `4330[{…,"view":{…}}]` (préfixe engine.io/socket.io puis tableau JSON). On la lit via
+  `game-bridge.js`. Succès visé : carte `.tyc-a` titre « Réussir 100 missions »
+  (« Major de promo »), `.got` quand obtenu.
 
 ## Fonctionnalités (état actuel)
 
@@ -67,12 +86,21 @@ direct** (sans recharger).
 4. **Stats du panneau de gauche** — réglage `stats` : « Hors ligne max » (12 h +
    bonus, ≈ bits produits) et « Café » (×mult · durée, prochain dans…). Les bits/s
    des **clics auto** sont affichés à côté des bits/s du jeu.
-5. **Décompte avant achat** — réglage `eta` : « ⏳ m:ss » à gauche du bouton des
-   machines pas encore achetables.
-6. **Achats rapides** — réglage `buy` : deux boutons dans la barre de quantité,
-   **×11** (meilleur rapport) et **→ palier** (jusqu'au prochain palier de la machine
-   cliquée). Mode global comme ×1/×10/Max. En DOM pur : on force ×1 et on clique le
-   vrai bouton d'achat N fois, puis on restaure le mode.
+5. **Décompte avant achat (machines)** — réglage `eta` : « ⏳ m:ss » à gauche du
+   bouton des machines pas encore achetables (onglet Labo).
+6. **Achat rapide** — réglage `buy` : bouton **→ palier** dans la barre de quantité
+   (achète jusqu'au prochain palier de la machine cliquée). Mode global comme
+   ×1/×10/Max. En DOM pur : on force ×1 et on clique le vrai bouton d'achat N fois,
+   puis on restaure le mode. *(Le bouton ×11 a existé puis a été retiré — voir plus
+   bas.)*
+7. **Sablier des améliorations** — réglage `sablier` : pastille « ⏳ h:mm:ss » en haut
+   à droite de chaque amélioration **disponible** mais pas encore payable (onglet
+   Améliorer). Temps = (coût `data-cost` − bits) ÷ rythme, comme l'ETA des machines.
+   Les cartes payables (`ok`) et bloquées (`locked`, par nombre de machines) n'en ont
+   pas.
+8. **Progression des missions** — réglage `missions` : pastille « N / 100 » (barre de
+   remplissage) ajoutée **dans la description** du succès « Réussir 100 missions »
+   (onglet Diplôme). `N` = `view.stats.missions`, lu via le pont WebSocket.
 
 ## Points de doute / questionnements — **résolus**
 
@@ -90,7 +118,15 @@ direct** (sans recharger).
 - **Optimum ≈ 11 machines** : exploré sur la branche `feature/graphe-prix-1pct` (un
   graphe dans l'info-bulle de la 3ᵉ colonne). Le creux est **toujours ~11**, quelle
   que soit la machine : c'est une propriété mathématique de la croissance ×1,15 et de
-  la formule de la 3ᵉ colonne, pas du jeu. D'où le bouton **×11**.
+  la formule de la 3ᵉ colonne, pas du jeu. Avait motivé un bouton **×11**, finalement
+  **retiré** (demande de l'auteur) ; seul **→ palier** reste.
+- **Trouver le compteur de missions.** Introuvable dans le DOM (onglet Missions, cartes
+  de succès, globals de page, REST). **Résolu** en interceptant la **WebSocket** du
+  jeu : on patche le constructeur `WebSocket` (Proxy) au plus tôt (`document_start`,
+  monde MAIN) et on écoute `message`. L'état `view` y arrive en entier (`view.stats` =
+  `{missions, clicks, coffees, bought, …}`). Parser validé en live : `missions` = 83.
+  Le patch de `WebSocket.prototype.send` (pour attraper l'instance) marche aussi mais
+  **rate le socket déjà ouvert** si injecté trop tard — d'où le `document_start`.
 - **Achat de N** : le jeu n'expose pas d'API ; seul `S.buyN` (1/10/Max) pilote la
   quantité. On force ×1 et on clique N fois le vrai bouton (vérifié en live :
   interception d'un clic en phase capture + `stopImmediatePropagation`, puis clics

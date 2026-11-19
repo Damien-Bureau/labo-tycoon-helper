@@ -78,6 +78,8 @@
   function update() {
     updateExtras();
     updateBuy();
+    updateMissions();
+    updateSablier();
     const list = document.getElementById('tycBuildings');
     if (!cfg.indicators || !list || document.hidden || !list.offsetParent) { updateRings(); updateEtas(); return; } // indicateurs masqués / Labo non affiché
 
@@ -539,16 +541,16 @@
       scheduled = pendingFull = pendingRings = false;
       if (!running) return;
       observer.disconnect();
-      try { if (full) update(); else { updateRings(); updateEtas(); updateBuy(); } } finally { if (running) observe(); }
+      try { if (full) update(); else { updateRings(); updateEtas(); updateBuy(); updateSablier(); updateMissions(); } } finally { if (running) observe(); }
     });
   });
   const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-  /* ---- Achats rapides : boutons ×11 et « → palier » dans la barre de quantité ----
-   * ×11 = le meilleur rapport (voir « Prix d'1 % de hausse »). « → palier » = jusqu'au
-   * prochain palier d'amélioration de la machine cliquée. DOM uniquement : on force le
-   * mode ×1 du jeu et on clique son bouton d'achat le bon nombre de fois. Réglage « buy ». */
-  let buyMode = null;  // null | 'p11' | 'tier'
+  /* ---- Achat rapide : bouton « → palier » dans la barre de quantité ----
+   * « → palier » = acheter la machine cliquée jusqu'à son prochain palier d'amélioration.
+   * DOM uniquement : on force le mode ×1 du jeu et on clique son bouton d'achat le bon
+   * nombre de fois. Réglage « buy ». */
+  let buyMode = null;  // null | 'tier'
   let buying = false;  // garde : ne pas intercepter nos propres clics programmés
 
   function tierRemaining(name, count) {
@@ -562,7 +564,6 @@
     const bar = document.getElementById('tycBuyN');
     if (!bar || bar.querySelector('.lte-buymode')) return;
     for (const [mode, label, title] of [
-      ['p11', '×11', 'Acheter 11 machines d’un coup (le meilleur rapport, voir « Prix d’1 % de hausse »)'],
       ['tier', '→ palier', 'Acheter la machine cliquée jusqu’à son prochain palier d’amélioration'],
     ]) {
       const b = document.createElement('button');
@@ -589,7 +590,7 @@
     const id = row.dataset.b;
     const count = Number(row.querySelector('.tyc-cnt')?.textContent) || 0;
     const name = (row.querySelector('.tyc-bt b')?.firstChild?.textContent || '').trim();
-    const n = mode === 'p11' ? 11 : tierRemaining(name, count);
+    const n = tierRemaining(name, count);
     if (!(n > 0)) return;
     buying = true;
     const prev = [...document.querySelectorAll('[data-tyc-n]')].find((b) => b.classList.contains('on'))?.dataset.tycN;
@@ -630,9 +631,74 @@
     }
   }, true);
 
+  /* ---- Progression des succès « missions » ----
+   * Le nombre de missions réussies vit dans l'état du jeu (WebSocket), pas dans le DOM.
+   * game-bridge.js (monde principal) nous le transmet via postMessage. On l'affiche dans la
+   * carte du succès « Réussir N missions ». Réglage « missions ». */
+  let gameStats = null; // { missions, clicks, coffees, … } venant du pont
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || e.origin !== location.origin) return;
+    const d = e.data;
+    if (!d || d.__lteGame !== 1) return;
+    gameStats = d.stats || gameStats;
+    if (running) updateMissions();
+  });
+
+  function updateMissions() {
+    if (!cfg.missions) return;
+    const done = gameStats && Number.isFinite(gameStats.missions) ? gameStats.missions : null;
+    for (const a of document.querySelectorAll('.tyc-a')) {
+      const m = /Réussir\s+(\d+)\s+missions?/i.exec(a.getAttribute('title') || a.textContent || '');
+      if (!m) continue;
+      const target = Number(m[1]);
+      // Pastille inline ajoutée dans la description de la carte (évite de recouvrir le titre).
+      const desc = a.querySelector('.small') || a;
+      let el = desc.querySelector(':scope > .lte-prog');
+      if (a.classList.contains('got') || done === null) { el?.remove(); continue; } // déjà obtenu : rien
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'lte-prog';
+        desc.appendChild(el);
+      }
+      const pct = Math.max(0, Math.min(1, done / target));
+      setText(el, `${done} / ${target}`, `Il te reste ${Math.max(0, target - done)} mission(s) pour « ${(a.querySelector('b')?.textContent || '').trim()} »`);
+      el.style.setProperty('--lte-prog', `${(pct * 100).toFixed(1)}%`);
+    }
+  }
+
+  /* ---- Sablier des améliorations disponibles ----
+   * Onglet Améliorer : chaque carte « .tyc-u.ready » est une amélioration débloquée (data-cost =
+   * coût en bits). On affiche le temps avant de pouvoir la payer = (coût − bits) ÷ rythme, comme
+   * l'ETA des bâtiments. Les cartes « .ok » (déjà payables) et « .locked » (bloquées par un nombre
+   * de machines, pas par le temps) n'en reçoivent pas. Réglage « sablier ». */
+  function updateSablier() {
+    if (!cfg.sablier || document.hidden) return;
+    const bits = readBits();
+    const rate = incomeRate();
+    for (const card of document.querySelectorAll('.tyc-u.ready')) {
+      let el = card.querySelector(':scope > .lte-sab');
+      const cost = Number(card.dataset.cost);
+      const missing = cost - bits;
+      // Payable tout de suite (.ok), coût illisible, ou rythme nul → pas de sablier
+      if (card.classList.contains('ok') || !card.offsetParent || !(missing > 0) || !(rate > 0)) {
+        if (el) el.hidden = true;
+        continue;
+      }
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'lte-sab';
+        card.appendChild(el);
+        card.classList.add('lte-sab-on');
+      }
+      el.hidden = false;
+      const eta = missing / rate;
+      setText(el, `⏳ ${fmtClock(eta)}`, `Payable dans ${fmtDuration(eta)} au rythme actuel (${fmt(rate)} bits/s, clics auto compris)`);
+    }
+  }
+
   /* ------------------------- Réglages (popup) ------------------------- */
-  // chrome.storage.local : { indicators, rings, stats, eta, buy } (booléens, true par défaut).
-  const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true, buy: true };
+  // chrome.storage.local : { indicators, rings, stats, eta, buy, missions } (booléens, true par défaut).
+  const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true, buy: true, missions: true, sablier: true };
   let cfg = { indicators: false, rings: false };
   let running = false, timer = null;
 
@@ -658,6 +724,13 @@
     buyMode = null;
     document.querySelectorAll('.lte-buymode').forEach((el) => el.remove());
   };
+  const removeMissions = () => {
+    document.querySelectorAll('.lte-prog').forEach((el) => el.remove());
+  };
+  const removeSablier = () => {
+    document.querySelectorAll('.lte-sab').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-sab-on').forEach((el) => el.classList.remove('lte-sab-on'));
+  };
 
   /** Applique les réglages : retire ce qui est désactivé, démarre / arrête la surveillance de la page. */
   function applyConfig(next) {
@@ -667,7 +740,9 @@
     if (!cfg.stats) removeStats();
     if (!cfg.eta) removeEtas();
     if (!cfg.buy) removeBuy();
-    const active = cfg.indicators || cfg.rings || cfg.stats || cfg.eta || cfg.buy;
+    if (!cfg.missions) removeMissions();
+    if (!cfg.sablier) removeSablier();
+    const active = cfg.indicators || cfg.rings || cfg.stats || cfg.eta || cfg.buy || cfg.missions || cfg.sablier;
     if (active && !running) {
       running = true;
       observe();
