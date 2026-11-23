@@ -526,6 +526,7 @@
     for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
       const btn = row.querySelector('.tyc-buy');
       if (!btn) continue;
+      btn.classList.add('lte-eta-on'); // réserve la place du ⏳ sur toutes les lignes (barres alignées)
       let el = btn.querySelector(':scope > .lte-eta');
       const cost = parseNum(row.querySelector('.tyc-buyc')?.textContent);
       const missing = cost - bits;
@@ -533,10 +534,7 @@
       if (!el) {
         el = document.createElement('span');
         el.className = 'lte-eta';
-        // même fond que la carte (thème clair ou sombre) : masque proprement une description longue
-        el.style.background = getComputedStyle(row).backgroundColor;
         btn.appendChild(el);
-        btn.classList.add('lte-eta-on');
       }
       el.hidden = false;
       const eta = missing / rate;

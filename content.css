@@ -97,10 +97,12 @@
 }
 
 /* Décompte avant de pouvoir acheter, à gauche du bouton d'achat (onglet Labo) */
-.lte-eta-on { position: relative; }
+/* Le bouton d'achat se décale de 88 px vers la droite : le ⏳ occupe ce vide au lieu de chevaucher la barre
+   de palier et son texte. Appliqué à toutes les lignes (même celles sans ⏳) pour garder les barres alignées. */
+.lte-eta-on { position: relative; margin-left: 88px; }
 .lte-eta {
   position: absolute;
-  right: calc(100% + 10px);
+  right: calc(100% + 14px);
   top: 50%;
   transform: translateY(-50%);
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -109,7 +111,8 @@
   font-variant-numeric: tabular-nums;
   color: #858999;
   white-space: nowrap;
-  padding: 2px 0 2px 8px;
+  text-align: right;
+  padding: 2px 0;
   pointer-events: none;
 }
 .lte-eta[hidden] { display: none; }
