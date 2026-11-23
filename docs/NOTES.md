@@ -62,6 +62,26 @@ variables de la page).
   `game-bridge.js`. Succès visé : carte `.tyc-a` titre « Réussir 100 missions »
   (« Major de promo »), `.got` quand obtenu.
 
+## Saison 2 (nov. 2026) — ce qui a changé côté DOM
+
+- **`.tyc-each` (« +X/s chacun ») n'est plus affiché** dès qu'une machine a un palier à venir
+  (barre `.tyc-tierbar` + texte `.tyc-tiert` à la place) : sans lui, les 3 indicateurs
+  restaient à « — ». On déduit maintenant la production par machine de **total ÷ nombre**
+  (ligne `.tyc-bt .muted.small` = « 102/s · 0 % »). Précision limitée par l'arrondi du jeu
+  (2-3 chiffres significatifs).
+- **Palier suivant lu dans le DOM** : `.tyc-tiert` = « 25 / 50 → « … » ×2 » → cible exacte
+  (`domTier`). « disponible dans Améliorer » = palier déjà atteint → pas de « N restantes ».
+  `BASE_TIERS` / paliers appris ne servent plus que si le jeu n'affiche pas cette ligne.
+- **Croissance des prix toujours ×1,15** (re-mesurée sur ×10 et ×100). Nouveau bouton **×100**.
+- **`#tycBits` est un odomètre** (`<span class="d">` par chiffre) : `textContent` reste « 67,9 M ».
+- **Barre du bas mobile** : `#tycDockBits` / `#tycDockRate` (masquée sur grand écran). Les bits/s
+  des clics auto y sont aussi affichés.
+- **Le jeu affiche son propre temps d'achat** (`.tyc-buyt`, « dans 12 s ») dans le bouton :
+  doublon avec notre `⏳` (réglage `eta`), mais le nôtre compte aussi les clics auto.
+- **Défilement dans `#panelBody`** (sa barre mange ~15 px) : `fitColumns` mesure sa largeur utile.
+- Sablier des améliorations : texte seul (plus de fond ni de contour jaune).
+- **Clics** : `#tycClickVal` garde le format « +X par clic · 🐒 N clics/s auto ».
+
 ## Fonctionnalités (état actuel)
 
 Chaque réglage est masquable dans la popup ; « Tout activer » et un **double-appui

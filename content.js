@@ -85,11 +85,14 @@
     const rows = [];
     let base = 0; // production de base = somme des bits/s de chaque bâtiment (hors bonus temporaires)
     for (const row of list.querySelectorAll('.tyc-b[data-b]')) {
-      const each = parseNum(row.querySelector('.tyc-each')?.textContent);
       const cost = parseNum(row.querySelector('.tyc-buyc')?.textContent);
       const qty = parseQty(row.querySelector('.tyc-buyl')?.textContent);
       const count = Number((row.querySelector('.tyc-cnt')?.textContent || '').trim()) || 0;
       const total = count ? parseNum(row.querySelector('.tyc-bt .muted.small')?.textContent) : 0;
+      // Saison 2 : « +X/s chacun » (.tyc-each) n'est plus affiché dès qu'un palier est à venir
+      // (barre de palier à la place). On le déduit alors du total de la machine : total ÷ nombre.
+      let each = parseNum(row.querySelector('.tyc-each')?.textContent);
+      if (!isFinite(each) && count > 0 && isFinite(total)) each = total / count;
       if (isFinite(total)) base += total;
       const name = (row.querySelector('.tyc-bt b')?.firstChild?.textContent || '').trim();
       const gain = each * qty; // bits/s ajoutés par cet achat
@@ -239,17 +242,28 @@
     setText(cof.lastChild, next ? `prochain dans ${next[1]}` : 'production × durée', '');
     cof.title = t;
 
-    // À côté des bits/s du jeu : bits/s des clics auto
-    const rateBox = document.getElementById('tycRate')?.parentElement;
-    if (rateBox) {
-      let cr = rateBox.querySelector(':scope > .lte-clickrate');
-      const clicks = autoClickRate();
-      if (!clicks) { cr?.remove(); }
-      else {
-        if (!cr) { cr = document.createElement('span'); cr.className = 'lte-clickrate'; rateBox.appendChild(cr); }
-        const prod = parseNum(document.getElementById('tycRate')?.textContent) || 0;
-        setText(cr, ` + ${fmt(clicks)}/s (clics auto)`, `Clics automatiques : ${fmt(clicks)} bits/s, non comptés dans les bits/s du jeu\nTotal : ${fmt(prod + clicks)} bits/s`);
-      }
+    updateClickRate();
+  }
+
+  /** À côté des bits/s du jeu : bits/s des clics auto, sur sa propre ligne sous « 462 k bits/s » (compteur
+   *  principal) et dans la barre du bas mobile. Le jeu ne les compte pas dans ses bits/s. */
+  function updateClickRate() {
+    const clicks = autoClickRate();
+    const prod = parseNum(document.getElementById('tycRate')?.textContent) || 0;
+    const targets = [
+      [document.getElementById('tycRate')?.parentElement, 'lte-clickrate'],
+      [document.getElementById('tycDockRate')?.parentElement, 'lte-clickrate lte-clickrate-dock'],
+    ];
+    for (const [box, cls] of targets) {
+      if (!box) continue;
+      let cr = box.querySelector(':scope > .lte-clickrate');
+      if (!clicks) { cr?.remove(); continue; }
+      if (!cr) { cr = document.createElement('span'); cr.className = cls; box.appendChild(cr); }
+      setText(
+        cr,
+        `+ ${fmt(clicks)}/s clics`,
+        `Clics automatiques : ${fmt(clicks)} bits/s, non comptés dans les bits/s du jeu\nTotal : ${fmt(prod + clicks)} bits/s`
+      );
     }
   }
 
@@ -260,7 +274,9 @@
     const current = parseFloat(list.style.getPropertyValue('--lte-shrink')) || 0;
     const naturalRight = first.row.getBoundingClientRect().right + current; // bord droit sans rétrécissement
     const need = 12 + side.offsetWidth + 16; // écart + colonnes + marge
-    const shrink = Math.max(0, Math.ceil(naturalRight + need - document.documentElement.clientWidth));
+    // Saison 2 : le jeu défile dans #panelBody (sa barre de défilement mange ~15 px) → on mesure sa zone utile
+    const avail = document.getElementById('panelBody')?.clientWidth || document.documentElement.clientWidth;
+    const shrink = Math.max(0, Math.ceil(naturalRight + need - avail));
     if (Math.abs(shrink - current) >= 1) list.style.setProperty('--lte-shrink', `${shrink}px`);
   }
 
@@ -281,13 +297,28 @@
     if (changed) chrome.storage.local.set({ tiers: learnedTiers });
     return learnedTiers;
   }
+  /** Saison 2 : le jeu écrit lui-même « 25 / 50 → « Code en assembleur » ×2 » sous chaque machine.
+   *  Renvoie le palier exact (50), ou null si le palier est déjà atteint (« disponible dans Améliorer »).
+   *  undefined = le jeu n'affiche pas cette ligne (on retombe sur les paliers appris / habituels). */
+  function domTier(row) {
+    const t = row.querySelector('.tyc-tiert')?.textContent;
+    if (!t) return undefined;
+    const m = /(\d+)\s*\/\s*(\d+)/.exec(t);
+    return m ? Number(m[2]) : null;
+  }
+  function nextTierTarget(row, name, count) {
+    const dom = domTier(row);
+    if (dom !== undefined) return dom === null || dom <= count ? NaN : dom;
+    const learned = (learnedTiers[name] || []).filter((n) => n > count);
+    const guessed = BASE_TIERS.filter((n) => n > count);
+    return Math.min(...learned, ...guessed);
+  }
   function updateNextTier(r, tiers, bits, rate) {
     const nameEl = r.row.querySelector('.tyc-bt b');
     if (!nameEl) return;
     let el = nameEl.querySelector(':scope > .lte-next');
     const learned = (tiers[r.name] || []).filter((n) => n > r.count);
-    const guessed = BASE_TIERS.filter((n) => n > r.count);
-    const target = Math.min(...learned, ...guessed);
+    const target = nextTierTarget(r.row, r.name, r.count);
     if (!isFinite(target) || !isFinite(r.unit)) { el?.remove(); return; }
     if (!el) {
       el = document.createElement('span');
@@ -552,10 +583,8 @@
   let buyMode = null;  // null | 'tier'
   let buying = false;  // garde : ne pas intercepter nos propres clics programmés
 
-  function tierRemaining(name, count) {
-    const learned = (learnedTiers[name] || []).filter((n) => n > count);
-    const guessed = BASE_TIERS.filter((n) => n > count);
-    const target = Math.min(...learned, ...guessed);
+  function tierRemaining(row, name, count) {
+    const target = nextTierTarget(row, name, count);
     return isFinite(target) ? target - count : 0;
   }
 
@@ -589,7 +618,7 @@
     const id = row.dataset.b;
     const count = Number(row.querySelector('.tyc-cnt')?.textContent) || 0;
     const name = (row.querySelector('.tyc-bt b')?.firstChild?.textContent || '').trim();
-    const n = tierRemaining(name, count);
+    const n = tierRemaining(row, name, count);
     if (!(n > 0)) return;
     buying = true;
     const prev = [...document.querySelectorAll('[data-tyc-n]')].find((b) => b.classList.contains('on'))?.dataset.tycN;

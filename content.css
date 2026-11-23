@@ -114,13 +114,19 @@
 }
 .lte-eta[hidden] { display: none; }
 
-/* Bits/s des clics auto, à côté des bits/s du jeu */
+/* Bits/s des clics auto : sur leur propre ligne sous « N bits/s » (compteur principal) */
 .lte-clickrate {
+  display: block;
   font-size: 0.85em;
   font-weight: 600;
   opacity: 0.75;
   cursor: help;
   white-space: nowrap;
+}
+/* … et à la suite des bits/s dans la barre du bas (mobile) */
+.lte-clickrate-dock {
+  display: inline;
+  margin-left: 6px;
 }
 
 /* Bouton d'achat rapide (→ palier) dans la barre de quantité du jeu.
@@ -132,7 +138,7 @@
 }
 
 /* Sablier : temps avant de pouvoir payer une amélioration disponible (onglet Améliorer).
-   Pastille en haut à droite de la carte. Couleurs translucides : lisibles en thème clair et sombre. */
+   Texte seul en haut à droite de la carte, sans fond ni contour. */
 .tyc-u.lte-sab-on { position: relative; }
 .lte-sab {
   position: absolute;
@@ -141,10 +147,9 @@
   font: 600 11px/1 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-variant-numeric: tabular-nums;
   color: #9a6a00;
-  background: rgba(214, 170, 91, 0.18);
-  border: 1px solid rgba(214, 170, 91, 0.45);
-  border-radius: 999px;
-  padding: 3px 6px;
+  background: none;
+  border: 0;
+  padding: 3px 0;
   white-space: nowrap;
   pointer-events: none;
 }
