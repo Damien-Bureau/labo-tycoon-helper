@@ -21,8 +21,8 @@ variables de la page).
   l'état `view` est enfermé dans une closure, inaccessible au content script isolé.
 - `content.js` — toute la logique (IIFE). Sections : parsing/format, `update()` +
   sous-updaters (`updateRings`, `updateEtas`, `updateExtras`, `updateBuy`,
-  `updateSablier`, `updateMissions`), achat rapide, réglages/popup, raccourci
-  double-Ctrl, réception des données du pont (`message`).
+  `updateSablier`), achat rapide, réglages/popup, raccourci
+  double-Ctrl. (`game-bridge.js` n'est plus utilisé par `content.js` depuis le retrait du compteur de missions.)
 - `content.css` — styles, préfixe `.lte-`.
 - `popup.html` / `popup.css` / `popup.js` — la popup de réglages.
 
@@ -98,9 +98,6 @@ direct** (sans recharger).
    Améliorer). Temps = (coût `data-cost` − bits) ÷ rythme, comme l'ETA des machines.
    Les cartes payables (`ok`) et bloquées (`locked`, par nombre de machines) n'en ont
    pas.
-8. **Progression des missions** — réglage `missions` : texte « N / 100 » en bas à droite de la carte (barre de
-   remplissage) ajoutée **dans la description** du succès « Réussir 100 missions »
-   (onglet Diplôme). `N` = `view.stats.missions`, lu via le pont WebSocket.
 
 ## Points de doute / questionnements — **résolus**
 

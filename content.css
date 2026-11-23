@@ -131,35 +131,6 @@
   box-shadow: none !important;
 }
 
-/* Progression d'un succès « Réussir N missions » (onglet Diplôme).
-   Texte seul, ancré dans le coin inférieur droit de la carte (sans fond ni contour).
-   Sélecteur spécifique + !important : le CSS du jeu ne doit pas pouvoir le déformer. */
-.tyc-a.lte-prog-on { position: relative !important; }
-.tyc-a .lte-prog {
-  position: absolute !important;
-  right: 12px !important;
-  bottom: 8px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  font-style: normal !important;
-  line-height: 1 !important;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
-  font-variant-numeric: tabular-nums;
-  color: #5b68d6 !important;
-  opacity: 0.85;
-  background: none !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  text-shadow: none !important;
-  white-space: nowrap !important;
-  pointer-events: auto;
-  cursor: help;
-}
-
 /* Sablier : temps avant de pouvoir payer une amélioration disponible (onglet Améliorer).
    Pastille en haut à droite de la carte. Couleurs translucides : lisibles en thème clair et sombre. */
 .tyc-u.lte-sab-on { position: relative; }

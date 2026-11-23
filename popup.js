@@ -4,10 +4,9 @@
 //   stats      : afficher les stats supplémentaires (hors ligne max, café) dans le panneau de gauche
 //   eta        : afficher le décompte avant de pouvoir acheter une machine
 //   sablier    : afficher le temps avant de pouvoir payer une amélioration dispo (onglet Améliorer)
-//   missions   : afficher la progression N / 100 sur le succès « 100 missions »
 //   buy        : afficher le bouton d'achat rapide (→ palier)
 // content.js réagit immédiatement, sans recharger la page.
-const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true, buy: true, sablier: true, missions: true };
+const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true, buy: true, sablier: true };
 const KEYS = Object.keys(DEFAULTS);
 
 const all = document.getElementById('all');

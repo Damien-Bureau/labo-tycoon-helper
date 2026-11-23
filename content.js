@@ -78,7 +78,6 @@
   function update() {
     updateExtras();
     updateBuy();
-    updateMissions();
     updateSablier();
     const list = document.getElementById('tycBuildings');
     if (!cfg.indicators || !list || document.hidden || !list.offsetParent) { updateRings(); updateEtas(); return; } // indicateurs masqués / Labo non affiché
@@ -541,7 +540,7 @@
       scheduled = pendingFull = pendingRings = false;
       if (!running) return;
       observer.disconnect();
-      try { if (full) update(); else { updateRings(); updateEtas(); updateBuy(); updateSablier(); updateMissions(); } } finally { if (running) observe(); }
+      try { if (full) update(); else { updateRings(); updateEtas(); updateBuy(); updateSablier(); } } finally { if (running) observe(); }
     });
   });
   const observe = () => observer.observe(document.body, { childList: true, subtree: true, characterData: true });
@@ -631,42 +630,6 @@
     }
   }, true);
 
-  /* ---- Progression des succès « missions » ----
-   * Le nombre de missions réussies vit dans l'état du jeu (WebSocket), pas dans le DOM.
-   * game-bridge.js (monde principal) nous le transmet via postMessage. On l'affiche dans la
-   * carte du succès « Réussir N missions ». Réglage « missions ». */
-  let gameStats = null; // { missions, clicks, coffees, … } venant du pont
-  window.addEventListener('message', (e) => {
-    if (e.source !== window || e.origin !== location.origin) return;
-    const d = e.data;
-    if (!d || d.__lteGame !== 1) return;
-    gameStats = d.stats || gameStats;
-    if (running) updateMissions();
-  });
-
-  function updateMissions() {
-    if (!cfg.missions) return;
-    const done = gameStats && Number.isFinite(gameStats.missions) ? gameStats.missions : null;
-    for (const a of document.querySelectorAll('.tyc-a')) {
-      const m = /Réussir\s+(\d+)\s+missions?/i.exec(a.getAttribute('title') || a.textContent || '');
-      if (!m) continue;
-      const target = Number(m[1]);
-      // Pastille inline ajoutée dans la description de la carte (évite de recouvrir le titre).
-      const desc = a.querySelector('.small') || a;
-      let el = desc.querySelector(':scope > .lte-prog');
-      if (a.classList.contains('got') || done === null) { el?.remove(); a.classList.remove('lte-prog-on'); continue; } // déjà obtenu : rien
-      if (!el) {
-        el = document.createElement('span');
-        el.className = 'lte-prog';
-        desc.appendChild(el);
-      }
-      a.classList.add('lte-prog-on'); // la carte devient le repère de position de la pastille
-      const pct = Math.max(0, Math.min(1, done / target));
-      setText(el, `${done} / ${target}`, `Il te reste ${Math.max(0, target - done)} mission(s) pour « ${(a.querySelector('b')?.textContent || '').trim()} »`);
-      el.style.setProperty('--lte-prog', `${(pct * 100).toFixed(1)}%`);
-    }
-  }
-
   /* ---- Sablier des améliorations disponibles ----
    * Onglet Améliorer : chaque carte « .tyc-u.ready » est une amélioration débloquée (data-cost =
    * coût en bits). On affiche le temps avant de pouvoir la payer = (coût − bits) ÷ rythme, comme
@@ -698,8 +661,8 @@
   }
 
   /* ------------------------- Réglages (popup) ------------------------- */
-  // chrome.storage.local : { indicators, rings, stats, eta, buy, missions } (booléens, true par défaut).
-  const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true, buy: true, missions: true, sablier: true };
+  // chrome.storage.local : { indicators, rings, stats, eta, buy, sablier } (booléens, true par défaut).
+  const DEFAULTS = { indicators: true, rings: true, stats: true, eta: true, buy: true, sablier: true };
   let cfg = { indicators: false, rings: false };
   let running = false, timer = null;
 
@@ -725,10 +688,6 @@
     buyMode = null;
     document.querySelectorAll('.lte-buymode').forEach((el) => el.remove());
   };
-  const removeMissions = () => {
-    document.querySelectorAll('.lte-prog').forEach((el) => el.remove());
-    document.querySelectorAll('.lte-prog-on').forEach((el) => el.classList.remove('lte-prog-on'));
-  };
   const removeSablier = () => {
     document.querySelectorAll('.lte-sab').forEach((el) => el.remove());
     document.querySelectorAll('.lte-sab-on').forEach((el) => el.classList.remove('lte-sab-on'));
@@ -742,9 +701,8 @@
     if (!cfg.stats) removeStats();
     if (!cfg.eta) removeEtas();
     if (!cfg.buy) removeBuy();
-    if (!cfg.missions) removeMissions();
     if (!cfg.sablier) removeSablier();
-    const active = cfg.indicators || cfg.rings || cfg.stats || cfg.eta || cfg.buy || cfg.missions || cfg.sablier;
+    const active = cfg.indicators || cfg.rings || cfg.stats || cfg.eta || cfg.buy || cfg.sablier;
     if (active && !running) {
       running = true;
       observe();
