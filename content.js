@@ -654,12 +654,13 @@
       // Pastille inline ajoutée dans la description de la carte (évite de recouvrir le titre).
       const desc = a.querySelector('.small') || a;
       let el = desc.querySelector(':scope > .lte-prog');
-      if (a.classList.contains('got') || done === null) { el?.remove(); continue; } // déjà obtenu : rien
+      if (a.classList.contains('got') || done === null) { el?.remove(); a.classList.remove('lte-prog-on'); continue; } // déjà obtenu : rien
       if (!el) {
         el = document.createElement('span');
         el.className = 'lte-prog';
         desc.appendChild(el);
       }
+      a.classList.add('lte-prog-on'); // la carte devient le repère de position de la pastille
       const pct = Math.max(0, Math.min(1, done / target));
       setText(el, `${done} / ${target}`, `Il te reste ${Math.max(0, target - done)} mission(s) pour « ${(a.querySelector('b')?.textContent || '').trim()} »`);
       el.style.setProperty('--lte-prog', `${(pct * 100).toFixed(1)}%`);
@@ -726,6 +727,7 @@
   };
   const removeMissions = () => {
     document.querySelectorAll('.lte-prog').forEach((el) => el.remove());
+    document.querySelectorAll('.lte-prog-on').forEach((el) => el.classList.remove('lte-prog-on'));
   };
   const removeSablier = () => {
     document.querySelectorAll('.lte-sab').forEach((el) => el.remove());

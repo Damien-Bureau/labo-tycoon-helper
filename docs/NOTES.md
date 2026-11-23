@@ -98,7 +98,7 @@ direct** (sans recharger).
    Améliorer). Temps = (coût `data-cost` − bits) ÷ rythme, comme l'ETA des machines.
    Les cartes payables (`ok`) et bloquées (`locked`, par nombre de machines) n'en ont
    pas.
-8. **Progression des missions** — réglage `missions` : pastille « N / 100 » (barre de
+8. **Progression des missions** — réglage `missions` : texte « N / 100 » en bas à droite de la carte (barre de
    remplissage) ajoutée **dans la description** du succès « Réussir 100 missions »
    (onglet Diplôme). `N` = `view.stats.missions`, lu via le pont WebSocket.
 

@@ -132,30 +132,31 @@
 }
 
 /* Progression d'un succès « Réussir N missions » (onglet Diplôme).
-   Petite pastille discrète à la fin de la description, avec une barre de remplissage.
-   Le sélecteur est volontairement spécifique et les propriétés typographiques en !important :
-   le CSS du jeu (span / .small / b…) ne doit pas pouvoir agrandir ou recolorer la pastille. */
+   Texte seul, ancré dans le coin inférieur droit de la carte (sans fond ni contour).
+   Sélecteur spécifique + !important : le CSS du jeu ne doit pas pouvoir le déformer. */
+.tyc-a.lte-prog-on { position: relative !important; }
 .tyc-a .lte-prog {
-  display: inline-block !important;
-  box-sizing: border-box !important;
-  margin: 0 0 0 6px !important;
-  padding: 1px 7px !important;
-  vertical-align: 1px !important;
+  position: absolute !important;
+  right: 12px !important;
+  bottom: 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
   font-size: 11px !important;
   font-weight: 600 !important;
   font-style: normal !important;
-  line-height: 1.5 !important;
+  line-height: 1 !important;
   letter-spacing: 0 !important;
   text-transform: none !important;
   font-variant-numeric: tabular-nums;
   color: #5b68d6 !important;
-  background: linear-gradient(90deg, rgba(91, 104, 214, 0.22) var(--lte-prog, 0%), rgba(91, 104, 214, 0.08) var(--lte-prog, 0%)) !important;
-  border: 1px solid rgba(91, 104, 214, 0.3) !important;
-  border-radius: 999px !important;
+  opacity: 0.85;
+  background: none !important;
+  border: 0 !important;
   box-shadow: none !important;
   text-shadow: none !important;
   white-space: nowrap !important;
+  pointer-events: auto;
   cursor: help;
 }
 
