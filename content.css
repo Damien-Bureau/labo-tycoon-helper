@@ -132,19 +132,30 @@
 }
 
 /* Progression d'un succès « Réussir N missions » (onglet Diplôme).
-   Pastille inline ajoutée à la fin de la description, avec une barre de remplissage. */
-.lte-prog {
-  display: inline-block;
-  margin-left: 6px;
-  vertical-align: baseline;
-  font: 700 10.5px/1 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+   Petite pastille discrète à la fin de la description, avec une barre de remplissage.
+   Le sélecteur est volontairement spécifique et les propriétés typographiques en !important :
+   le CSS du jeu (span / .small / b…) ne doit pas pouvoir agrandir ou recolorer la pastille. */
+.tyc-a .lte-prog {
+  display: inline-block !important;
+  box-sizing: border-box !important;
+  margin: 0 0 0 6px !important;
+  padding: 1px 7px !important;
+  vertical-align: 1px !important;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  font-style: normal !important;
+  line-height: 1.5 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
   font-variant-numeric: tabular-nums;
-  color: #5b68d6;
-  background: linear-gradient(90deg, rgba(91, 104, 214, 0.28) var(--lte-prog, 0%), rgba(91, 104, 214, 0.12) var(--lte-prog, 0%));
-  border: 1px solid rgba(91, 104, 214, 0.4);
-  border-radius: 999px;
-  padding: 2px 6px;
-  white-space: nowrap;
+  color: #5b68d6 !important;
+  background: linear-gradient(90deg, rgba(91, 104, 214, 0.22) var(--lte-prog, 0%), rgba(91, 104, 214, 0.08) var(--lte-prog, 0%)) !important;
+  border: 1px solid rgba(91, 104, 214, 0.3) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  white-space: nowrap !important;
   cursor: help;
 }
 
