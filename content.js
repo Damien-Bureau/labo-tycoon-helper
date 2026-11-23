@@ -612,35 +612,49 @@
     }
   }
 
-  // Achète n fois la machine via son vrai bouton, en forçant le mode ×1 du jeu puis en le restaurant.
-  function customBuy(row, mode) {
-    if (!row || buying) return;
-    const id = row.dataset.b;
+  /** Nombre de machines à acheter pour atteindre le prochain palier de cette ligne (0 = rien à faire :
+   *  palier déjà atteint — à acheter dans « Améliorer » —, tous les paliers faits, ou palier inconnu). */
+  function rowTierRemaining(row) {
     const count = Number(row.querySelector('.tyc-cnt')?.textContent) || 0;
     const name = (row.querySelector('.tyc-bt b')?.firstChild?.textContent || '').trim();
     const n = tierRemaining(row, name, count);
-    if (!(n > 0)) return;
+    return n > 0 && n <= MAX_QUICK_BUY ? n : 0;
+  }
+  const MAX_QUICK_BUY = 300; // garde-fou : jamais plus de 300 clics programmés d'un coup
+
+  // Achète n fois la machine via son vrai bouton, en forçant le mode ×1 du jeu puis en le restaurant.
+  // try/finally : quoi qu'il arrive, on rend la main (garde `buying`) et on remet la quantité de l'utilisateur.
+  function customBuy(row) {
+    const n = row ? rowTierRemaining(row) : 0;
+    if (!(n > 0) || buying) return;
+    const id = row.dataset.b;
     buying = true;
     const prev = [...document.querySelectorAll('[data-tyc-n]')].find((b) => b.classList.contains('on'))?.dataset.tycN;
     const setMode = (v) => document.querySelector(`[data-tyc-n="${v}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    if (prev !== '1') setMode('1');
-    for (let i = 0; i < n; i++) {
-      const b = document.querySelector(`#tycBuildings .tyc-b[data-b="${id}"] .tyc-buy`);
-      if (!b) break;
-      b.dispatchEvent(new MouseEvent('click', { bubbles: true })); // non abouti côté serveur si plus assez de bits
+    try {
+      if (prev !== '1') setMode('1');
+      for (let i = 0; i < n; i++) {
+        const b = document.querySelector(`#tycBuildings .tyc-b[data-b="${id}"] .tyc-buy`);
+        if (!b) break;
+        b.dispatchEvent(new MouseEvent('click', { bubbles: true })); // non abouti côté serveur si plus assez de bits
+      }
+    } finally {
+      try { if (prev && prev !== '1') setMode(prev); } finally { buying = false; }
     }
-    if (prev && prev !== '1') setMode(prev);
-    buying = false;
   }
 
-  // En mode d'achat rapide, un clic sur une machine lance customBuy au lieu de l'achat normal.
+  // En mode d'achat rapide, un clic sur une machine lance customBuy au lieu de l'achat normal…
+  // … sauf s'il n'y a rien à faire pour ce palier (déjà atteint, tous faits, inconnu) : le clic part alors
+  // normalement vers le jeu, au lieu d'être avalé sans rien acheter.
   document.addEventListener('click', (e) => {
     if (buying || !buyMode) return;
     const btn = e.target.closest && e.target.closest('.tyc-buy');
     if (!btn || !btn.closest('#tycBuildings')) return;
+    const row = btn.closest('.tyc-b[data-b]');
+    if (!row || !rowTierRemaining(row)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
-    customBuy(btn.closest('.tyc-b[data-b]'), buyMode);
+    customBuy(row);
   }, true);
 
   // Clic sur nos boutons de mode ; choisir une quantité du jeu (×1/×10/Max) désactive notre mode.
