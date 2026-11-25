@@ -1,7 +1,7 @@
 // Popup : réglages partagés avec content.js via chrome.storage.local.
 //   indicators : afficher les indicateurs (onglet Labo)
 //   rings      : afficher les contours des boutons d'achat (Labo + Améliorer)
-//   stats      : afficher les stats supplémentaires (hors ligne max, café) dans le panneau de gauche
+//   stats      : afficher les stats supplémentaires (hors ligne max, nombre de machines) dans le panneau de gauche
 //   eta        : afficher le décompte avant de pouvoir acheter une machine
 //   sablier    : afficher le temps avant de pouvoir payer une amélioration dispo (onglet Améliorer)
 //   buy        : afficher le bouton d'achat rapide (→ palier)

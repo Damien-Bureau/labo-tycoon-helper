@@ -104,7 +104,7 @@ direct** (sans recharger).
    l'ouverture d'un onglet. En mode **Max**, le contour montre la progression vers
    l'unité suivante.
 4. **Stats du panneau de gauche** — réglage `stats` : « Hors ligne max » (12 h +
-   bonus, ≈ bits produits) et « Café » (×mult · durée, prochain dans…). Les bits/s
+   bonus, ≈ bits produits) et « Machines » (nombre total de machines du labo). Les bits/s
    des **clics auto** sont affichés à côté des bits/s du jeu.
 5. **Décompte avant achat (machines)** — réglage `eta` : « ⏳ m:ss » à gauche du
    bouton des machines pas encore achetables (onglet Labo).

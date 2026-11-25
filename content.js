@@ -180,13 +180,14 @@
     updateEtas();
   }
 
-  /* ---- Panneau de gauche : durée hors ligne max et café ----
+  /* ---- Panneau de gauche : durée hors ligne max et nombre de machines ----
    * Hors ligne : le serveur n'envoie pas le maximum. Base 12 h (message « Pendant ton absence » du jeu)
    * + bonus obtenus : améliorations installées, R&D terminées, composants trouvés (« Production hors ligne : +N h »).
-   * Café : le jeu met multiplicateur et durée dans l'info-bulle du bouton café.
+   * Machines : somme des compteurs de chaque machine du Labo.
    * Réglage « stats » de la popup. */
   const OFFLINE_BASE_H = 12;
   let extrasAt = 0;
+  let lastMachines = null; // { total, kinds } — dernière valeur lue
   function updateExtras() {
     if (!cfg.stats || document.hidden) return;
     const now = performance.now();
@@ -200,10 +201,10 @@
       box.className = 'tyc-mini lte-extra';
       box.innerHTML =
         '<div title=""><span class="muted small">Hors ligne max</span><b></b><span class="muted small"></span></div>' +
-        '<div title=""><span class="muted small">Café</span><b></b><span class="muted small"></span></div>';
+        '<div title=""><span class="muted small">Machines</span><b></b><span class="muted small"></span></div>';
       mini.after(box);
     }
-    const [off, cof] = box.children;
+    const [off, mach] = box.children;
 
     // Hors ligne
     const bonus = [];
@@ -234,13 +235,17 @@
       bonus.map((b) => `• ${b.label} : +${fmtH(b.h)}`).join('\n') +
       '\n\nLa base de 12 h vient du message « Pendant ton absence » du jeu ; le serveur ne donne pas le total.';
 
-    // Café
-    const t = document.getElementById('tycCoffee')?.title || '';
-    const m = /×\s*([\d.,]+)\s*pendant\s*([\d.,]+)\s*min/i.exec(t);
-    setText(cof.querySelector('b'), m ? `×${m[1]} · ${m[2].replace('.', ',')} min` : '—', '');
-    const next = /prochain café dans ([\d:]+)/i.exec(t);
-    setText(cof.lastChild, next ? `prochain dans ${next[1]}` : 'production × durée', '');
-    cof.title = t;
+    // Machines : nombre total, toutes machines confondues (somme des compteurs .tyc-cnt du Labo)
+    let totalMachines = 0, kinds = 0;
+    for (const row of document.querySelectorAll('#tycBuildings .tyc-b[data-b]')) {
+      const n = Number((row.querySelector('.tyc-cnt')?.textContent || '').trim()) || 0;
+      if (n > 0) { totalMachines += n; kinds++; }
+    }
+    if (totalMachines > 0) lastMachines = { total: totalMachines, kinds };
+    const mc = lastMachines; // garde la dernière valeur si le Labo n'est pas affiché
+    setText(mach.querySelector('b'), mc ? mc.total.toLocaleString('fr-FR') : '—', '');
+    setText(mach.lastChild, mc ? `${mc.kinds} type${mc.kinds > 1 ? 's' : ''}` : 'dans le labo', '');
+    mach.title = mc ? `Nombre total de machines dans le labo : ${mc.total}\nRéparties sur ${mc.kinds} type${mc.kinds > 1 ? 's' : ''} de machine` : '';
 
     updateClickRate();
   }
